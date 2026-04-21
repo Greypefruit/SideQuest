@@ -12,3 +12,10 @@ if (!connectionString) {
 const sql = postgres(connectionString, { max: 1 });
 
 export const db = drizzle(sql, { schema });
+export { schema, sql };
+
+export type DatabaseClient = typeof db;
+export type DatabaseTransaction = Parameters<
+  Parameters<DatabaseClient["transaction"]>[0]
+>[0];
+export type DbExecutor = DatabaseClient | DatabaseTransaction;
