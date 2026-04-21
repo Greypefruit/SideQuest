@@ -371,3 +371,19 @@
 - затем читать документы в правильном порядке
 - искать ответ в документе, который отвечает именно за этот тип вопроса
 - не смешивать продукт, модель данных, роли, этапы, стек, валидации и правила работы Codex в один слой
+## UI и визуальная система
+
+### `UI_FOUNDATION.md`
+Документ, который фиксирует визуальную основу интерфейса SideQuest Release 1.
+
+Использовать как основной источник истины для:
+- app shell
+- mobile / desktop navigation
+- layout rules
+- card-based composition
+- buttons, inputs, badges
+- empty / error / loading states
+- desktop adaptation rules
+- единый визуальный стиль для auth, tournaments, profile, ranking, matches, home
+
+При работе над UI Codex должен опираться на `UI_FOUNDATION.md` и не переизобретать визуальный язык заново.
