@@ -15,6 +15,7 @@ import {
 const authUserIdLength = 255;
 const emailLength = 255;
 const displayNameLength = 120;
+const otpCodeHashLength = 64;
 const activityCodeLength = 64;
 const activityNameLength = 120;
 const competitionTitleLength = 255;
@@ -68,6 +69,32 @@ export const profiles = pgTable(
     check(
       "profiles_display_name_not_empty",
       sql`char_length(trim(${table.displayName})) > 0`,
+    ),
+  ],
+);
+
+export const authOtpChallenges = pgTable(
+  "auth_otp_challenges",
+  {
+    id: uuid("id").defaultRandom().primaryKey(),
+    email: varchar("email", { length: emailLength }).notNull(),
+    codeHash: varchar("code_hash", { length: otpCodeHashLength }).notNull(),
+    attemptsCount: integer("attempts_count").notNull().default(0),
+    expiresAt: timestamp("expires_at").notNull(),
+    resendAvailableAt: timestamp("resend_available_at").notNull(),
+    consumedAt: timestamp("consumed_at"),
+    invalidatedAt: timestamp("invalidated_at"),
+    createdAt: timestamp("created_at").defaultNow().notNull(),
+    updatedAt: timestamp("updated_at").defaultNow().notNull(),
+  },
+  (table) => [
+    check(
+      "auth_otp_challenges_email_not_empty",
+      sql`char_length(trim(${table.email})) > 0`,
+    ),
+    check(
+      "auth_otp_challenges_attempts_count_valid",
+      sql`${table.attemptsCount} >= 0 and ${table.attemptsCount} <= 5`,
     ),
   ],
 );

@@ -1,4 +1,5 @@
 export * from "./activity-types";
+export * from "./auth-otp";
 export * from "./competition-matches";
 export * from "./competition-participants";
 export * from "./competitions";

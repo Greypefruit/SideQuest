@@ -63,6 +63,29 @@ export async function createProfile(
   return profile;
 }
 
+export async function ensureProfileExists(
+  input: CreateProfileInput,
+  database?: DbExecutor,
+) {
+  const connection = getDb(database);
+
+  const [createdProfile] = await connection
+    .insert(profiles)
+    .values({
+      ...input,
+      email: normalizeEmail(input.email),
+      displayName: input.displayName.trim(),
+    })
+    .onConflictDoNothing({ target: profiles.email })
+    .returning();
+
+  if (createdProfile) {
+    return createdProfile;
+  }
+
+  return getProfileByEmail(input.email, connection);
+}
+
 export async function updateProfile(
   profileId: string,
   input: UpdateProfileInput,
