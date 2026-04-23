@@ -3,7 +3,7 @@ import { createHmac, timingSafeEqual } from "node:crypto";
 import { cookies } from "next/headers";
 import { SESSION_COOKIE_NAME, SESSION_MAX_AGE_SECONDS } from "./constants";
 
-type SessionPayload = {
+export type SessionPayload = {
   profileId: string;
   authUserId: string;
   email: string;

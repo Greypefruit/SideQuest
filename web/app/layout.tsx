@@ -14,7 +14,7 @@ const geistMono = Geist_Mono({
 
 export const metadata: Metadata = {
   title: "SideQuest",
-  description: "Вход в SideQuest Release 1",
+  description: "SideQuest Release 1",
 };
 
 export default function RootLayout({
