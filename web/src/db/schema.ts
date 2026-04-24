@@ -14,6 +14,7 @@ import {
 
 const authUserIdLength = 255;
 const emailLength = 255;
+const personNameLength = 120;
 const displayNameLength = 120;
 const otpCodeHashLength = 64;
 const activityCodeLength = 64;
@@ -58,6 +59,8 @@ export const profiles = pgTable(
       .notNull()
       .unique(),
     email: varchar("email", { length: emailLength }).notNull().unique(),
+    firstName: varchar("first_name", { length: personNameLength }),
+    lastName: varchar("last_name", { length: personNameLength }),
     displayName: varchar("display_name", { length: displayNameLength }).notNull(),
     role: profileRoleEnum("role").notNull().default("player"),
     isActive: boolean("is_active").notNull().default(true),
@@ -66,6 +69,14 @@ export const profiles = pgTable(
   },
   (table) => [
     check("profiles_email_not_empty", sql`char_length(trim(${table.email})) > 0`),
+    check(
+      "profiles_first_name_not_empty",
+      sql`${table.firstName} is null or char_length(trim(${table.firstName})) > 0`,
+    ),
+    check(
+      "profiles_last_name_not_empty",
+      sql`${table.lastName} is null or char_length(trim(${table.lastName})) > 0`,
+    ),
     check(
       "profiles_display_name_not_empty",
       sql`char_length(trim(${table.displayName})) > 0`,

@@ -11,7 +11,10 @@ type CreateProfileInput = Pick<
   Partial<Pick<typeof profiles.$inferInsert, "role" | "isActive">>;
 
 type UpdateProfileInput = Partial<
-  Pick<typeof profiles.$inferInsert, "displayName" | "email" | "role" | "isActive">
+  Pick<
+    typeof profiles.$inferInsert,
+    "displayName" | "email" | "firstName" | "lastName" | "role" | "isActive"
+  >
 >;
 
 export async function getProfileById(profileId: string, database?: DbExecutor) {
@@ -99,6 +102,14 @@ export async function updateProfile(
 
   if (input.email !== undefined) {
     patch.email = normalizeEmail(input.email);
+  }
+
+  if (input.firstName !== undefined) {
+    patch.firstName = input.firstName === null ? null : input.firstName.trim();
+  }
+
+  if (input.lastName !== undefined) {
+    patch.lastName = input.lastName === null ? null : input.lastName.trim();
   }
 
   if (input.role !== undefined) {
