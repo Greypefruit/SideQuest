@@ -1,5 +1,5 @@
 import "server-only";
-import { and, asc, eq } from "drizzle-orm";
+import { and, asc, eq, sql } from "drizzle-orm";
 import { type DbExecutor } from "../index";
 import { activityTypes, participants, profiles, rankings } from "../schema";
 import {
@@ -107,4 +107,77 @@ export async function listActivityRanking(
     .innerJoin(activityTypes, eq(participants.activityTypeId, activityTypes.id))
     .where(eq(participants.activityTypeId, activityTypeId))
     .orderBy(...rankingOrder, asc(participants.id));
+}
+
+export async function countActivityRankingEntries(
+  activityTypeId: string,
+  database?: DbExecutor,
+) {
+  const [result] = await getDb(database)
+    .select({
+      count: sql<number>`count(*)::int`,
+    })
+    .from(rankings)
+    .innerJoin(participants, eq(rankings.participantId, participants.id))
+    .where(eq(participants.activityTypeId, activityTypeId));
+
+  return result?.count ?? 0;
+}
+
+type ListActivityRankingPageOptions = {
+  limit: number;
+  offset: number;
+};
+
+export async function listActivityRankingPage(
+  activityTypeId: string,
+  options: ListActivityRankingPageOptions,
+  database?: DbExecutor,
+) {
+  return getDb(database)
+    .select({
+      ranking: rankingColumns,
+      participant: participantColumns,
+      profile: profileColumns,
+      activityType: activityTypeColumns,
+    })
+    .from(rankings)
+    .innerJoin(participants, eq(rankings.participantId, participants.id))
+    .innerJoin(profiles, eq(participants.profileId, profiles.id))
+    .innerJoin(activityTypes, eq(participants.activityTypeId, activityTypes.id))
+    .where(eq(participants.activityTypeId, activityTypeId))
+    .orderBy(...rankingOrder, asc(participants.id))
+    .limit(options.limit)
+    .offset(options.offset);
+}
+
+export async function getActivityRankingViewerPosition(
+  activityTypeId: string,
+  profileId: string,
+  database?: DbExecutor,
+) {
+  const connection = getDb(database);
+  const rankedEntries = connection
+    .select({
+      profileId: profiles.id,
+      position:
+        sql<number>`row_number() over (order by ${rankings.rating} desc, ${rankings.matchesPlayed} desc, ${rankings.wins} desc, ${rankings.losses} asc, ${profiles.displayName} asc, ${profiles.email} asc)`.as(
+          "position",
+        ),
+    })
+    .from(rankings)
+    .innerJoin(participants, eq(rankings.participantId, participants.id))
+    .innerJoin(profiles, eq(participants.profileId, profiles.id))
+    .where(eq(participants.activityTypeId, activityTypeId))
+    .as("ranked_entries");
+
+  const [result] = await connection
+    .select({
+      position: rankedEntries.position,
+    })
+    .from(rankedEntries)
+    .where(eq(rankedEntries.profileId, profileId))
+    .limit(1);
+
+  return result?.position ?? null;
 }
