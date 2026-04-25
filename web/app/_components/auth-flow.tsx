@@ -225,7 +225,7 @@ export function AuthFlow({ initialEmail = "" }: AuthFlowProps) {
 
   return (
     <section
-      className={`w-full max-w-[24rem] rounded-[28px] border border-slate-200/80 bg-white shadow-[0_18px_45px_rgba(15,23,42,0.08)] ${
+      className={`w-full max-w-[24rem] rounded-[var(--radius-default)] border border-slate-200/80 bg-white shadow-[0_18px_45px_rgba(15,23,42,0.08)] ${
         isEmailStep ? "p-6 sm:p-8" : "p-5 sm:p-7"
       }`}
     >
@@ -257,7 +257,7 @@ export function AuthFlow({ initialEmail = "" }: AuthFlowProps) {
                 setError(null);
               }}
               aria-invalid={shouldHighlightEmailError}
-              className={`w-full rounded-2xl border bg-white px-4 py-3.5 text-base text-slate-950 outline-none transition placeholder:text-slate-400 focus:border-blue-600 focus:ring-4 focus:ring-blue-100 ${
+              className={`w-full rounded-[var(--radius-default)] border bg-white px-4 py-3.5 text-base text-slate-950 outline-none transition placeholder:text-slate-400 focus:border-blue-600 focus:ring-4 focus:ring-blue-100 ${
                 shouldHighlightEmailError
                   ? "border-rose-400 focus:border-rose-500 focus:ring-rose-100"
                   : "border-slate-200"
@@ -274,7 +274,7 @@ export function AuthFlow({ initialEmail = "" }: AuthFlowProps) {
           <button
             type="submit"
             disabled={isSubmitting || isRequestOtpCooldownActive}
-            className="w-full rounded-2xl bg-blue-600 px-4 py-3.5 text-sm font-semibold text-white transition hover:bg-blue-500 disabled:cursor-not-allowed disabled:bg-blue-300"
+            className="w-full rounded-[var(--radius-default)] bg-blue-600 px-4 py-3.5 text-sm font-semibold text-white transition hover:bg-blue-500 disabled:cursor-not-allowed disabled:bg-blue-300"
           >
             {isSubmitting ? "Отправляем..." : "Получить код"}
           </button>
@@ -314,7 +314,7 @@ export function AuthFlow({ initialEmail = "" }: AuthFlowProps) {
                   value={code[index] ?? ""}
                   onChange={(event) => handleOtpInputChange(index, event.target.value)}
                   onKeyDown={(event) => handleOtpKeyDown(event, index)}
-                  className={`h-[3.25rem] w-[3.25rem] rounded-[18px] border bg-white text-center text-xl font-semibold text-slate-950 outline-none transition focus:border-blue-600 focus:ring-4 focus:ring-blue-100 sm:h-14 sm:w-14 ${
+                  className={`h-[3.25rem] w-[3.25rem] rounded-[var(--radius-default)] border bg-white text-center text-xl font-semibold text-slate-950 outline-none transition focus:border-blue-600 focus:ring-4 focus:ring-blue-100 sm:h-14 sm:w-14 ${
                     shouldHighlightCodeError
                       ? "border-rose-400 focus:border-rose-500 focus:ring-rose-100"
                       : "border-slate-200"
@@ -333,7 +333,7 @@ export function AuthFlow({ initialEmail = "" }: AuthFlowProps) {
           <button
             type="submit"
             disabled={isSubmitting}
-            className="w-full rounded-2xl bg-blue-600 px-4 py-3 text-sm font-semibold text-white transition hover:bg-blue-500 disabled:cursor-not-allowed disabled:bg-blue-300"
+            className="w-full rounded-[var(--radius-default)] bg-blue-600 px-4 py-3 text-sm font-semibold text-white transition hover:bg-blue-500 disabled:cursor-not-allowed disabled:bg-blue-300"
           >
             {isSubmitting ? "Проверяем..." : "Войти"}
           </button>

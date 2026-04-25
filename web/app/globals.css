@@ -3,6 +3,7 @@
 :root {
   --background: #ffffff;
   --foreground: #0f172a;
+  --radius-default: 8px;
 }
 
 @theme inline {

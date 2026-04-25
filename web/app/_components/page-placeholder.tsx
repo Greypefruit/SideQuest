@@ -24,7 +24,7 @@ export function PagePlaceholder({
         <h1 className="text-[2rem] font-semibold tracking-tight text-slate-950">{title}</h1>
       </header>
 
-      <section className="rounded-[28px] border border-slate-200/80 bg-white p-6 shadow-[0_18px_45px_rgba(15,23,42,0.06)] sm:p-7">
+      <section className="rounded-[var(--radius-default)] border border-slate-200/80 bg-white p-6 shadow-[0_18px_45px_rgba(15,23,42,0.06)] sm:p-7">
         <div className="max-w-2xl space-y-3">
           <p className="text-sm font-medium uppercase tracking-[0.18em] text-slate-500">
             Раздел Release 1
@@ -36,7 +36,7 @@ export function PagePlaceholder({
           {details.map((detail) => (
             <div
               key={detail.label}
-              className="rounded-3xl border border-slate-200/80 bg-slate-50/70 p-4"
+              className="rounded-[var(--radius-default)] border border-slate-200/80 bg-slate-50/70 p-4"
             >
               <p className="text-xs font-medium uppercase tracking-[0.16em] text-slate-500">
                 {detail.label}
