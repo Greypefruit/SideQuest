@@ -1,5 +1,5 @@
 import "server-only";
-import { and, eq } from "drizzle-orm";
+import { and, asc, eq } from "drizzle-orm";
 import { type DbExecutor } from "../index";
 import { activityTypes, participants, profiles } from "../schema";
 import {
@@ -107,4 +107,29 @@ export async function ensureParticipantExists(
     input.activityTypeId,
     connection,
   );
+}
+
+export async function listActiveParticipantProfilesByActivity(
+  activityTypeId: string,
+  database?: DbExecutor,
+) {
+  return getDb(database)
+    .select({
+      participantId: participants.id,
+      profileId: profiles.id,
+      displayName: profiles.displayName,
+      firstName: profiles.firstName,
+      lastName: profiles.lastName,
+      email: profiles.email,
+    })
+    .from(participants)
+    .innerJoin(profiles, eq(participants.profileId, profiles.id))
+    .where(
+      and(
+        eq(participants.activityTypeId, activityTypeId),
+        eq(participants.isActive, true),
+        eq(profiles.isActive, true),
+      ),
+    )
+    .orderBy(asc(profiles.lastName), asc(profiles.firstName), asc(profiles.displayName));
 }

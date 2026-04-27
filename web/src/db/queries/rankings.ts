@@ -19,6 +19,13 @@ type CreateRankingInput = Pick<typeof rankings.$inferInsert, "participantId"> &
     >
   >;
 
+type UpdateRankingInput = Partial<
+  Pick<
+    typeof rankings.$inferInsert,
+    "rating" | "matchesPlayed" | "wins" | "losses"
+  >
+>;
+
 export async function getRankingByParticipantId(
   participantId: string,
   database?: DbExecutor,
@@ -61,6 +68,44 @@ export async function ensureRankingExists(
   }
 
   return getRankingByParticipantId(input.participantId, connection);
+}
+
+export async function updateRankingByParticipantId(
+  participantId: string,
+  input: UpdateRankingInput,
+  database?: DbExecutor,
+) {
+  const patch: UpdateRankingInput & { updatedAt?: Date } = {};
+
+  if (input.rating !== undefined) {
+    patch.rating = input.rating;
+  }
+
+  if (input.matchesPlayed !== undefined) {
+    patch.matchesPlayed = input.matchesPlayed;
+  }
+
+  if (input.wins !== undefined) {
+    patch.wins = input.wins;
+  }
+
+  if (input.losses !== undefined) {
+    patch.losses = input.losses;
+  }
+
+  if (Object.keys(patch).length === 0) {
+    return getRankingByParticipantId(participantId, database);
+  }
+
+  patch.updatedAt = new Date();
+
+  const [ranking] = await getDb(database)
+    .update(rankings)
+    .set(patch)
+    .where(eq(rankings.participantId, participantId))
+    .returning();
+
+  return ranking ?? null;
 }
 
 export async function getProfileRanking(
