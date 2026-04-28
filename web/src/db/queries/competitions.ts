@@ -1,5 +1,5 @@
 import "server-only";
-import { and, desc, eq, sql } from "drizzle-orm";
+import { and, desc, eq, inArray, or, sql } from "drizzle-orm";
 import { type DbExecutor } from "../index";
 import {
   activityTypes,
@@ -24,6 +24,8 @@ type CreateCompetitionInput = Pick<
   | "startedAt"
   | "completedAt"
 >;
+
+type CompetitionStatus = typeof competitions.$inferSelect.status;
 
 function buildCompetitionSummaryQuery(database?: DbExecutor) {
   return getDb(database)
@@ -67,14 +69,45 @@ function buildCompetitionSummaryQuery(database?: DbExecutor) {
 
 export async function listCompetitionsByActivity(
   activityTypeId: string,
+  options?: {
+    statuses?: CompetitionStatus[];
+  },
   database?: DbExecutor,
 ) {
+  const conditions = [eq(competitions.activityTypeId, activityTypeId)];
+
+  if (options?.statuses?.length) {
+    conditions.push(inArray(competitions.status, options.statuses));
+  }
+
   return buildCompetitionSummaryQuery(database)
-    .where(eq(competitions.activityTypeId, activityTypeId))
+    .where(and(...conditions))
     .orderBy(desc(competitions.createdAt));
 }
 
 export async function listCompetitionsByOwner(
+  ownerProfileId: string,
+  activityTypeId: string,
+  options?: {
+    statuses?: CompetitionStatus[];
+  },
+  database?: DbExecutor,
+) {
+  const conditions = [
+    eq(competitions.createdByProfileId, ownerProfileId),
+    eq(competitions.activityTypeId, activityTypeId),
+  ];
+
+  if (options?.statuses?.length) {
+    conditions.push(inArray(competitions.status, options.statuses));
+  }
+
+  return buildCompetitionSummaryQuery(database)
+    .where(and(...conditions))
+    .orderBy(desc(competitions.createdAt));
+}
+
+export async function listCompetitionsVisibleToOrganizerAll(
   ownerProfileId: string,
   activityTypeId: string,
   database?: DbExecutor,
@@ -82,8 +115,14 @@ export async function listCompetitionsByOwner(
   return buildCompetitionSummaryQuery(database)
     .where(
       and(
-        eq(competitions.createdByProfileId, ownerProfileId),
         eq(competitions.activityTypeId, activityTypeId),
+        or(
+          inArray(competitions.status, ["in_progress", "completed"]),
+          and(
+            eq(competitions.status, "draft"),
+            eq(competitions.createdByProfileId, ownerProfileId),
+          ),
+        ),
       ),
     )
     .orderBy(desc(competitions.createdAt));

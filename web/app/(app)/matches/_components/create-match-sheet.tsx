@@ -385,17 +385,17 @@ export function CreateMatchSheet({
 
             <div className="space-y-2.5">
               <FieldLabel>Формат матча</FieldLabel>
-              <div className="grid grid-cols-3 gap-2 rounded-[var(--radius-default)] bg-slate-100 p-1">
+              <div className="grid grid-cols-3 gap-2">
                 {(["BO1", "BO3", "BO5"] as MatchFormat[]).map((format) => {
                   const isActive = selectedFormat === format;
 
                   return (
                     <button
                       key={format}
-                      className={`inline-flex min-h-10 items-center justify-center rounded-[var(--radius-default)] text-[0.88rem] font-semibold transition ${
+                      className={`inline-flex min-h-12 items-center justify-center rounded-[var(--radius-default)] border text-[0.95rem] font-semibold transition ${
                         isActive
-                          ? "border border-blue-100 bg-white text-blue-700 shadow-[0_4px_10px_rgba(15,23,42,0.06)]"
-                          : "text-slate-600 hover:bg-slate-50"
+                          ? "border-blue-600 bg-blue-50 text-blue-700"
+                          : "border-slate-200 bg-white text-slate-600 hover:border-slate-300 hover:bg-slate-50"
                       }`}
                       onClick={() => {
                         setInteractionHint(null);

@@ -67,7 +67,7 @@ function getPageTitle(pathname: string) {
     return "Матчи";
   }
 
-  if (pathname === "/tournaments") {
+  if (pathname === "/tournaments" || pathname.startsWith("/tournaments/")) {
     return "Турниры";
   }
 
