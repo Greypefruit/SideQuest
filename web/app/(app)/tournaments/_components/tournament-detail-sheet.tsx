@@ -10,6 +10,7 @@ import {
   deleteTournamentDraftAction,
   generateTournamentBracketAction,
   removeTournamentParticipantAction,
+  saveTournamentMatchResultAction,
   updateTournamentDraftAction,
 } from "../actions";
 
@@ -29,13 +30,16 @@ type BracketMatchItem = {
   matchNumber: number;
   resolutionType: "bye" | "played" | null;
   roundNumber: number;
+  slot1ParticipantId: string | null;
   slot1Seed: number | null;
   slot2Seed: number | null;
+  slot2ParticipantId: string | null;
   slot1Score: number | null;
   slot2Score: number | null;
   slot1DisplayName: string | null;
   slot2DisplayName: string | null;
   status: "completed" | "pending";
+  winnerParticipantId: string | null;
   winnerDisplayName: string | null;
 };
 
@@ -264,12 +268,49 @@ function getRoundLabel(roundNumber: number, totalRounds: number) {
   return `Раунд ${roundNumber}`;
 }
 
+type MatchScore = {
+  player1: number;
+  player2: number;
+};
+
+type MatchWinnerKey = "player1" | "player2";
+
+const SCORE_OPTIONS: Record<MatchFormat, MatchScore[]> = {
+  BO1: [
+    { player1: 1, player2: 0 },
+    { player1: 0, player2: 1 },
+  ],
+  BO3: [
+    { player1: 2, player2: 0 },
+    { player1: 2, player2: 1 },
+    { player1: 0, player2: 2 },
+    { player1: 1, player2: 2 },
+  ],
+  BO5: [
+    { player1: 3, player2: 0 },
+    { player1: 3, player2: 1 },
+    { player1: 3, player2: 2 },
+    { player1: 0, player2: 3 },
+    { player1: 1, player2: 3 },
+    { player1: 2, player2: 3 },
+  ],
+};
+
+function getScoreText(score: MatchScore) {
+  return `${score.player1}:${score.player2}`;
+}
+
+function getScoreWinner(score: MatchScore): MatchWinnerKey {
+  return score.player1 > score.player2 ? "player1" : "player2";
+}
+
 type TournamentInfoBlockProps = {
   canManageDraft: boolean;
   dateValue: string;
   locationValue: string;
   locationDisplay: string;
   matchFormat: MatchFormat;
+  organizerDisplay: string;
   onDateChange: (value: string) => void;
   onLocationChange: (value: string) => void;
   onMatchFormatChange: (value: MatchFormat) => void;
@@ -284,6 +325,7 @@ function TournamentInfoBlock({
   locationValue,
   locationDisplay,
   matchFormat,
+  organizerDisplay,
   onDateChange,
   onLocationChange,
   onMatchFormatChange,
@@ -378,6 +420,14 @@ function TournamentInfoBlock({
         </p>
       ),
     },
+    {
+      label: "Организатор",
+      value: (
+        <p className="text-[0.94rem] font-medium text-slate-800 md:text-[0.88rem]">
+          {organizerDisplay}
+        </p>
+      ),
+    },
   ];
 
   return (
@@ -401,9 +451,19 @@ function TournamentInfoBlock({
 
 type BracketViewProps = {
   bracket: BracketRoundItem[];
+  canReportResults: boolean;
+  canOpenWinnerCelebration: boolean;
+  onOpenWinnerCelebration: (match: BracketMatchItem) => void;
+  onReportResult: (match: BracketMatchItem) => void;
 };
 
-function BracketView({ bracket }: BracketViewProps) {
+function BracketView({
+  bracket,
+  canOpenWinnerCelebration,
+  onOpenWinnerCelebration,
+  canReportResults,
+  onReportResult,
+}: BracketViewProps) {
   const totalRounds = bracket.length;
 
   return (
@@ -426,100 +486,216 @@ function BracketView({ bracket }: BracketViewProps) {
               const isCompleted = match.status === "completed";
               const isBye = match.resolutionType === "bye";
               const isFinal = round.roundNumber === totalRounds;
+              const hasBothParticipants = Boolean(
+                match.slot1ParticipantId && match.slot2ParticipantId,
+              );
+              const hasResolvedPlayers =
+                !isBye &&
+                isCompleted &&
+                Boolean(
+                  match.slot1ParticipantId &&
+                    match.slot2ParticipantId &&
+                    match.slot1DisplayName &&
+                    match.slot2DisplayName &&
+                    match.winnerParticipantId,
+                );
+              const canEnterResult =
+                canReportResults && !isCompleted && !isBye && hasBothParticipants;
+              const canOpenCelebration =
+                canOpenWinnerCelebration &&
+                isFinal &&
+                isCompleted &&
+                !isBye &&
+                Boolean(match.winnerParticipantId && match.winnerDisplayName);
               const hasScore =
                 match.slot1Score !== null && match.slot2Score !== null;
               const scoreText = hasScore
-                ? `${match.slot1Score}:${match.slot2Score}`
+                ? match.winnerParticipantId === match.slot2ParticipantId
+                  ? `${match.slot2Score}:${match.slot1Score}`
+                  : `${match.slot1Score}:${match.slot2Score}`
                 : isBye
                   ? "BYE"
                   : "—";
               const cardClassName = isBye
                 ? "border-blue-200/80 bg-gradient-to-br from-blue-50 via-indigo-50/60 to-white shadow-[0_8px_18px_rgba(37,99,235,0.06)]"
-                : isCompleted
-                  ? "border-emerald-200/90 bg-emerald-50/70 shadow-[0_8px_18px_rgba(16,185,129,0.05)]"
-                  : isFinal
-                    ? "border-blue-200/90 bg-white shadow-[0_10px_22px_rgba(37,99,235,0.08)]"
-                    : "border-slate-200 bg-white shadow-[0_8px_16px_rgba(15,23,42,0.05)]";
+                : isFinal
+                  ? "border-amber-300/90 bg-gradient-to-br from-amber-50 via-yellow-50/60 to-white shadow-[0_8px_18px_rgba(217,119,6,0.08)]"
+                  : "border-slate-200 bg-white shadow-[0_8px_16px_rgba(15,23,42,0.05)]";
+              const participantRows = hasResolvedPlayers
+                ? [
+                    {
+                      displayName:
+                        match.winnerParticipantId === match.slot1ParticipantId
+                          ? match.slot1DisplayName
+                          : match.slot2DisplayName,
+                      isWinner: true,
+                      score:
+                        match.winnerParticipantId === match.slot1ParticipantId
+                          ? match.slot1Score
+                          : match.slot2Score,
+                      seed:
+                        match.winnerParticipantId === match.slot1ParticipantId
+                          ? match.slot1Seed
+                          : match.slot2Seed,
+                    },
+                    {
+                      displayName:
+                        match.winnerParticipantId === match.slot1ParticipantId
+                          ? match.slot2DisplayName
+                          : match.slot1DisplayName,
+                      isWinner: false,
+                      score:
+                        match.winnerParticipantId === match.slot1ParticipantId
+                          ? match.slot2Score
+                          : match.slot1Score,
+                      seed:
+                        match.winnerParticipantId === match.slot1ParticipantId
+                          ? match.slot2Seed
+                          : match.slot1Seed,
+                    },
+                  ]
+                : null;
 
               return (
                 <article
                   key={match.id}
-                  className={`rounded-[var(--radius-default)] border px-3 py-2.5 transition md:px-2.5 md:py-2 ${cardClassName}`}
+                  className={`rounded-[var(--radius-default)] border px-3 py-2.5 transition md:px-2.5 md:py-2 ${cardClassName} ${
+                    canOpenCelebration ? "cursor-pointer hover:scale-[1.01]" : ""
+                  }`}
+                  onClick={canOpenCelebration ? () => onOpenWinnerCelebration(match) : undefined}
+                  role={canOpenCelebration ? "button" : undefined}
+                  tabIndex={canOpenCelebration ? 0 : undefined}
+                  onKeyDown={
+                    canOpenCelebration
+                      ? (event) => {
+                          if (event.key === "Enter" || event.key === " ") {
+                            event.preventDefault();
+                            onOpenWinnerCelebration(match);
+                          }
+                        }
+                      : undefined
+                  }
                 >
                   <div className="flex items-center justify-between gap-3">
-                    <span
-                      className={`text-[0.7rem] font-semibold uppercase tracking-[0.08em] ${
-                        isBye
-                          ? "text-blue-700"
-                          : isCompleted
-                            ? "text-emerald-700"
-                            : "text-slate-600"
-                      }`}
-                    >
-                      {isBye ? "Автопроход" : isCompleted ? "Сыгран" : "Ожидается"}
-                    </span>
-                    <span
-                      className={`inline-flex min-h-6 items-center rounded-[var(--radius-default)] border px-2.5 text-[0.76rem] font-semibold ${
-                        isBye
-                          ? "border-blue-200 bg-white/85 text-blue-700"
-                          : isCompleted
-                            ? "border-emerald-200 bg-white/90 text-emerald-700"
+                    <div className="flex items-center gap-2">
+                      <span
+                        className={`text-[0.7rem] font-semibold uppercase tracking-[0.08em] ${
+                          isBye
+                            ? "text-blue-700"
+                            : isCompleted
+                              ? "text-slate-900"
+                              : "text-slate-600"
+                        }`}
+                      >
+                        {isBye ? "Автопроход" : isCompleted ? "Сыгран" : "Ожидается"}
+                      </span>
+                    </div>
+                    {isCompleted && !isBye ? (
+                      <span
+                        className={`inline-flex min-h-6 items-center rounded-[var(--radius-default)] border px-2.5 text-[0.76rem] font-semibold ${
+                          isFinal
+                            ? "border-amber-200 bg-amber-50/85 text-slate-700"
+                            : "border-slate-200 bg-slate-50 text-slate-600"
+                        }`}
+                      >
+                        {scoreText}
+                      </span>
+                    ) : (
+                      <span
+                        className={`inline-flex min-h-6 items-center rounded-[var(--radius-default)] border px-2.5 text-[0.76rem] font-semibold ${
+                          isBye
+                            ? "border-blue-200 bg-white/85 text-blue-700"
+                            : isFinal
+                              ? "border-amber-200 bg-amber-50/85 text-slate-700"
                             : "border-slate-200 bg-slate-50 text-slate-500"
-                      }`}
-                    >
-                      {scoreText}
-                    </span>
+                        }`}
+                      >
+                        {scoreText}
+                      </span>
+                    )}
                   </div>
 
                   <div className="mt-2 space-y-1.5 text-[0.9rem] md:mt-1.5 md:text-[0.82rem]">
-                    <p
-                      className={`font-medium ${
-                        match.winnerDisplayName === match.slot1DisplayName
-                          ? "text-slate-900"
-                          : "text-slate-800"
-                      }`}
-                    >
-                      {match.slot1DisplayName ? (
-                        <>
-                          {match.slot1Seed ? (
-                            <span className="mr-1 text-[0.8em] font-semibold text-blue-700">
-                              #{match.slot1Seed}
-                            </span>
-                          ) : null}
-                          {match.slot1DisplayName}
-                        </>
-                      ) : (
-                        "Ожидает победителя..."
-                      )}
-                    </p>
-                    <p
-                      className={`font-medium ${
-                        match.winnerDisplayName === match.slot2DisplayName
-                          ? "text-slate-900"
-                          : "text-slate-800"
-                      }`}
-                    >
-                      {match.slot2DisplayName ? (
-                        <>
-                          {match.slot2Seed ? (
-                            <span className="mr-1 text-[0.8em] font-semibold text-blue-700">
-                              #{match.slot2Seed}
-                            </span>
-                          ) : null}
-                          {match.slot2DisplayName}
-                        </>
-                      ) : isBye ? (
-                        <span className="text-slate-600">Свободный слот (BYE)</span>
-                      ) : (
-                        "Ожидает победителя..."
-                      )}
-                    </p>
+                    {participantRows ? (
+                      participantRows.map((row) => (
+                        <div
+                          key={`${match.id}-${row.displayName}-${row.isWinner ? "winner" : "loser"}`}
+                          className="rounded-[var(--radius-default)] px-1 py-0.5"
+                        >
+                          <p
+                            className={`truncate font-medium ${
+                              row.isWinner ? "font-semibold text-slate-950" : "text-slate-700"
+                            }`}
+                          >
+                            {row.seed ? (
+                              <span className="mr-1 text-[0.8em] font-semibold text-blue-600">
+                                #{row.seed}
+                              </span>
+                            ) : null}
+                            {row.displayName}
+                          </p>
+                        </div>
+                      ))
+                    ) : (
+                      <>
+                        <p
+                          className={`font-medium ${
+                            match.winnerDisplayName === match.slot1DisplayName
+                              ? "text-slate-900"
+                              : "text-slate-800"
+                          }`}
+                        >
+                          {match.slot1DisplayName ? (
+                            <>
+                              {match.slot1Seed ? (
+                                <span className="mr-1 text-[0.8em] font-semibold text-blue-700">
+                                  #{match.slot1Seed}
+                                </span>
+                              ) : null}
+                              {match.slot1DisplayName}
+                            </>
+                          ) : (
+                            "Ожидает победителя..."
+                          )}
+                        </p>
+                        <p
+                          className={`font-medium ${
+                            match.winnerDisplayName === match.slot2DisplayName
+                              ? "text-slate-900"
+                              : "text-slate-800"
+                          }`}
+                        >
+                          {match.slot2DisplayName ? (
+                            <>
+                              {match.slot2Seed ? (
+                                <span className="mr-1 text-[0.8em] font-semibold text-blue-700">
+                                  #{match.slot2Seed}
+                                </span>
+                              ) : null}
+                              {match.slot2DisplayName}
+                            </>
+                          ) : isBye ? (
+                            <span className="text-slate-600">Свободный слот (BYE)</span>
+                          ) : (
+                            "Ожидает победителя..."
+                          )}
+                        </p>
+                      </>
+                    )}
                   </div>
 
                   {isBye ? (
                     <p className="mt-1.5 text-[0.72rem] text-slate-600 md:text-[0.68rem]">
                       Участник автоматически проходит в следующий раунд
                     </p>
+                  ) : canEnterResult ? (
+                    <button
+                      className="mt-2 inline-flex min-h-9 w-full items-center justify-center rounded-[var(--radius-default)] border border-blue-500 bg-blue-500 px-3 text-[0.84rem] font-semibold text-white transition hover:bg-blue-600 md:min-h-8 md:text-[0.78rem]"
+                      onClick={() => onReportResult(match)}
+                      type="button"
+                    >
+                      Внести результат
+                    </button>
                   ) : null}
                 </article>
               );
@@ -527,6 +703,441 @@ function BracketView({ bracket }: BracketViewProps) {
           </div>
         </section>
       ))}
+    </div>
+  );
+}
+
+type WinnerCelebrationData = {
+  finalScore: string | null;
+  matchId: string;
+  winnerName: string;
+  winnerSeed: number | null;
+};
+
+function getWinnerOrderedScoreText(match: {
+  slot1ParticipantId: string | null;
+  slot2ParticipantId: string | null;
+  slot1Score: number | null;
+  slot2Score: number | null;
+  winnerParticipantId: string | null;
+}) {
+  if (match.slot1Score === null || match.slot2Score === null) {
+    return null;
+  }
+
+  return match.winnerParticipantId === match.slot2ParticipantId
+    ? `${match.slot2Score}:${match.slot1Score}`
+    : `${match.slot1Score}:${match.slot2Score}`;
+}
+
+function createWinnerCelebrationData(
+  match: BracketMatchItem,
+  override?: {
+    score?: MatchScore;
+    winnerName?: string;
+    winnerParticipantId?: string;
+    winnerSeed?: number | null;
+  },
+): WinnerCelebrationData | null {
+  const winnerParticipantId = override?.winnerParticipantId ?? match.winnerParticipantId;
+
+  if (!winnerParticipantId) {
+    return null;
+  }
+
+  const winnerName =
+    override?.winnerName ??
+    (winnerParticipantId === match.slot1ParticipantId
+      ? match.slot1DisplayName
+      : match.slot2DisplayName);
+
+  if (!winnerName) {
+    return null;
+  }
+
+  const winnerSeed =
+    override?.winnerSeed ??
+    (winnerParticipantId === match.slot1ParticipantId ? match.slot1Seed : match.slot2Seed);
+  const finalScore = override?.score
+    ? winnerParticipantId === match.slot2ParticipantId
+      ? `${override.score.player2}:${override.score.player1}`
+      : `${override.score.player1}:${override.score.player2}`
+    : getWinnerOrderedScoreText(match);
+
+  return {
+    finalScore,
+    matchId: match.id,
+    winnerName,
+    winnerSeed,
+  };
+}
+
+function usePrefersReducedMotion() {
+  const [prefersReducedMotion, setPrefersReducedMotion] = useState(() =>
+    typeof window !== "undefined"
+      ? window.matchMedia("(prefers-reduced-motion: reduce)").matches
+      : false,
+  );
+
+  useEffect(() => {
+    const mediaQuery = window.matchMedia("(prefers-reduced-motion: reduce)");
+
+    function handleChange() {
+      setPrefersReducedMotion(mediaQuery.matches);
+    }
+
+    mediaQuery.addEventListener("change", handleChange);
+
+    return () => {
+      mediaQuery.removeEventListener("change", handleChange);
+    };
+  }, []);
+
+  return prefersReducedMotion;
+}
+
+type WinnerCelebrationOverlayProps = {
+  data: WinnerCelebrationData | null;
+  isOpen: boolean;
+  onClose: () => void;
+};
+
+function WinnerCelebrationOverlay({
+  data,
+  isOpen,
+  onClose,
+}: WinnerCelebrationOverlayProps) {
+  const prefersReducedMotion = usePrefersReducedMotion();
+
+  useEffect(() => {
+    if (!isOpen) {
+      return;
+    }
+
+    function handleKeyDown(event: KeyboardEvent) {
+      if (event.key === "Escape") {
+        onClose();
+      }
+    }
+
+    window.addEventListener("keydown", handleKeyDown);
+
+    return () => {
+      window.removeEventListener("keydown", handleKeyDown);
+    };
+  }, [isOpen, onClose]);
+
+  if (!isOpen || !data) {
+    return null;
+  }
+
+  const confettiPieces = [
+    { top: "18%", left: "10%", rotate: "-18deg", delay: "0ms" },
+    { top: "30%", left: "4%", rotate: "16deg", delay: "120ms" },
+    { top: "68%", left: "12%", rotate: "-10deg", delay: "240ms" },
+    { top: "20%", left: "86%", rotate: "20deg", delay: "80ms" },
+    { top: "42%", left: "92%", rotate: "-16deg", delay: "200ms" },
+    { top: "72%", left: "84%", rotate: "12deg", delay: "320ms" },
+  ];
+
+  return (
+    <div
+      className="fixed inset-0 z-[70] bg-slate-950/24 px-4 py-6 md:flex md:items-center md:justify-center"
+      onClick={(event) => {
+        if (event.target === event.currentTarget) {
+          onClose();
+        }
+      }}
+      role="presentation"
+    >
+      <section className="relative mx-auto mt-20 w-full max-w-[26rem] overflow-hidden rounded-[var(--radius-default)] border border-amber-200/80 bg-[linear-gradient(180deg,rgba(255,251,235,0.96)_0%,rgba(255,255,255,1)_55%)] p-5 shadow-[0_20px_50px_rgba(180,83,9,0.12)] md:mt-0">
+        {confettiPieces.map((piece, index) => (
+          <span
+            key={`${piece.left}-${piece.top}-${index}`}
+            className={`pointer-events-none absolute h-3 w-2 rounded-full bg-amber-300/90 ${
+              prefersReducedMotion ? "opacity-60" : "animate-bounce"
+            }`}
+            style={{
+              animationDelay: piece.delay,
+              animationDuration: "1.8s",
+              left: piece.left,
+              opacity: prefersReducedMotion ? 0.45 : 0.8,
+              top: piece.top,
+              transform: `rotate(${piece.rotate})`,
+            }}
+          />
+        ))}
+
+        <div className="relative text-center">
+          <p className="text-[0.72rem] font-semibold uppercase tracking-[0.12em] text-amber-700">
+            Победитель турнира
+          </p>
+          <h3 className="mt-3 text-[1.9rem] font-semibold leading-tight tracking-tight text-slate-950 md:text-[2.2rem]">
+            {data.winnerName}
+          </h3>
+
+          <div className="mt-4 flex flex-wrap items-center justify-center gap-2">
+            {data.winnerSeed ? (
+              <span className="inline-flex min-h-7 items-center rounded-full border border-blue-200 bg-white/85 px-3 text-[0.78rem] font-semibold text-blue-700">
+                Seed #{data.winnerSeed}
+              </span>
+            ) : null}
+            {data.finalScore ? (
+              <span className="inline-flex min-h-7 items-center rounded-full border border-amber-200 bg-amber-50/85 px-3 text-[0.78rem] font-semibold text-slate-700">
+                Финал: {data.finalScore}
+              </span>
+            ) : null}
+          </div>
+        </div>
+      </section>
+    </div>
+  );
+}
+
+type TournamentMatchResultSheetProps = {
+  isOpen: boolean;
+  match: BracketMatchItem | null;
+  matchFormat: MatchFormat;
+  onClose: () => void;
+  onSubmit: (payload: {
+    competitionMatchId: string;
+    score: MatchScore;
+    winnerParticipantId: string;
+  }) => Promise<{ ok: boolean; message?: string }>;
+};
+
+function TournamentMatchResultSheet({
+  isOpen,
+  match,
+  matchFormat,
+  onClose,
+  onSubmit,
+}: TournamentMatchResultSheetProps) {
+  const [selectedWinner, setSelectedWinner] = useState<MatchWinnerKey | null>(null);
+  const [selectedScore, setSelectedScore] = useState<MatchScore | null>(null);
+  const [isSubmitting, setIsSubmitting] = useState(false);
+  const [interactionHint, setInteractionHint] = useState<string | null>(null);
+
+  useEffect(() => {
+    if (!isOpen) {
+      return;
+    }
+
+    const previousOverflow = document.body.style.overflow;
+
+    function handleKeyDown(event: KeyboardEvent) {
+      if (event.key === "Escape") {
+        onClose();
+      }
+    }
+
+    document.body.style.overflow = "hidden";
+    window.addEventListener("keydown", handleKeyDown);
+
+    return () => {
+      document.body.style.overflow = previousOverflow;
+      window.removeEventListener("keydown", handleKeyDown);
+    };
+  }, [isOpen, onClose]);
+
+  const availableScores = useMemo(() => {
+    return SCORE_OPTIONS[matchFormat].filter((score) => {
+      if (!selectedWinner) {
+        return true;
+      }
+
+      return getScoreWinner(score) === selectedWinner;
+    });
+  }, [matchFormat, selectedWinner]);
+
+  if (!isOpen || !match || !match.slot1ParticipantId || !match.slot2ParticipantId) {
+    return null;
+  }
+
+  const currentMatch = match;
+  const slot1ParticipantId = currentMatch.slot1ParticipantId!;
+  const slot2ParticipantId = currentMatch.slot2ParticipantId!;
+
+  const winnerOptions = [
+    {
+      key: "player1" as const,
+      label: currentMatch.slot1DisplayName ?? "Участник 1",
+      participantId: slot1ParticipantId,
+      seed: currentMatch.slot1Seed,
+    },
+    {
+      key: "player2" as const,
+      label: currentMatch.slot2DisplayName ?? "Участник 2",
+      participantId: slot2ParticipantId,
+      seed: currentMatch.slot2Seed,
+    },
+  ];
+  const isFormValid = selectedWinner !== null && selectedScore !== null;
+
+  async function handleSubmit() {
+    if (!isFormValid || isSubmitting || !selectedWinner || !selectedScore) {
+      return;
+    }
+
+    setIsSubmitting(true);
+
+    try {
+      const selectedWinnerOption = winnerOptions.find((option) => option.key === selectedWinner);
+
+      if (!selectedWinnerOption) {
+        setInteractionHint("Не удалось определить победителя матча.");
+        return;
+      }
+
+      const result = await onSubmit({
+        competitionMatchId: currentMatch.id,
+        score: selectedScore,
+        winnerParticipantId: selectedWinnerOption.participantId,
+      });
+
+      if (!result.ok) {
+        setInteractionHint(result.message ?? "Не удалось сохранить результат матча.");
+        return;
+      }
+
+      onClose();
+    } catch {
+      setInteractionHint("Не удалось сохранить результат матча. Попробуйте еще раз.");
+    } finally {
+      setIsSubmitting(false);
+    }
+  }
+
+  return (
+    <div
+      className="fixed inset-0 z-[60] bg-white md:flex md:items-center md:justify-center md:bg-slate-950/38 md:p-4"
+      onClick={(event) => {
+        if (
+          event.target === event.currentTarget &&
+          window.matchMedia("(min-width: 768px)").matches
+        ) {
+          onClose();
+        }
+      }}
+      role="presentation"
+    >
+      <section className="flex h-full w-full flex-col bg-white md:h-auto md:max-h-[min(92vh,760px)] md:max-w-[32.5rem] md:overflow-hidden md:rounded-[var(--radius-default)] md:border md:border-slate-200/90 md:shadow-[0_20px_50px_rgba(15,23,42,0.16)]">
+        <header className="sticky top-0 z-10 flex items-center justify-between border-b border-slate-200/80 bg-white px-4 py-4 md:px-5 md:py-4">
+          <div className="flex min-w-0 items-center gap-3">
+            <button
+              className="inline-flex h-9 w-9 items-center justify-center rounded-[var(--radius-default)] text-blue-600 transition hover:bg-blue-50 md:hidden"
+              onClick={onClose}
+              type="button"
+            >
+              <BackArrowIcon />
+            </button>
+            <h2 className="text-[1.95rem] font-semibold tracking-tight text-slate-950 md:text-[1.55rem]">
+              Результат матча
+            </h2>
+          </div>
+
+          <button
+            className="hidden h-9 w-9 items-center justify-center rounded-[var(--radius-default)] text-slate-500 transition hover:bg-slate-100 hover:text-slate-700 md:inline-flex"
+            onClick={onClose}
+            type="button"
+          >
+            <CloseIcon />
+          </button>
+        </header>
+
+        <div className="flex-1 overflow-y-auto px-4 py-4 md:px-5 md:py-5">
+          <div className="space-y-5">
+            <section className="space-y-3 rounded-[var(--radius-default)] border border-slate-200/90 bg-white px-4 py-4 shadow-[0_10px_24px_rgba(15,23,42,0.03)]">
+              <div className="flex items-center justify-between gap-3">
+                <p className="text-[0.64rem] font-semibold uppercase tracking-[0.08em] text-slate-500">
+                  Матч {currentMatch.matchNumber}
+                </p>
+                <span className="inline-flex min-h-7 items-center rounded-[var(--radius-default)] border border-slate-200 bg-slate-50 px-3 text-[0.72rem] font-semibold text-slate-700">
+                  {matchFormat}
+                </span>
+              </div>
+
+              <div className="space-y-2">
+                {winnerOptions.map((option) => {
+                  const isActive = selectedWinner === option.key;
+
+                  return (
+                    <button
+                      key={option.key}
+                      className={`flex min-h-12 w-full items-center justify-between rounded-[var(--radius-default)] border px-3 text-left transition ${
+                        isActive
+                          ? "border-blue-600 bg-blue-50 text-blue-700"
+                          : "border-slate-200 bg-white text-slate-700 hover:border-slate-300 hover:bg-slate-50"
+                      }`}
+                      onClick={() => {
+                        setSelectedWinner(option.key);
+                        setSelectedScore(null);
+                        setInteractionHint(null);
+                      }}
+                      type="button"
+                    >
+                      <span className="truncate text-[0.95rem] font-medium">
+                        {option.seed ? `#${option.seed} ` : ""}
+                        {option.label}
+                      </span>
+                      <span className="text-[0.82rem] font-semibold">Победитель</span>
+                    </button>
+                  );
+                })}
+              </div>
+            </section>
+
+            <section className="space-y-3 rounded-[var(--radius-default)] border border-slate-200/90 bg-white px-4 py-4 shadow-[0_10px_24px_rgba(15,23,42,0.03)]">
+              <p className="text-[0.64rem] font-semibold uppercase tracking-[0.08em] text-slate-500">
+                Итоговый счет
+              </p>
+
+              <div className="grid grid-cols-2 gap-2 sm:grid-cols-3">
+                {availableScores.map((scoreOption) => {
+                  const isActive =
+                    selectedScore?.player1 === scoreOption.player1 &&
+                    selectedScore?.player2 === scoreOption.player2;
+
+                  return (
+                    <button
+                      key={getScoreText(scoreOption)}
+                      className={`inline-flex min-h-11 items-center justify-center rounded-[var(--radius-default)] border text-[0.94rem] font-semibold transition ${
+                        isActive
+                          ? "border-blue-600 bg-blue-50 text-blue-700"
+                          : "border-slate-200 bg-white text-slate-600 hover:border-slate-300 hover:bg-slate-50"
+                      }`}
+                      onClick={() => {
+                        setSelectedScore(scoreOption);
+                        setInteractionHint(null);
+                      }}
+                      type="button"
+                    >
+                      {getScoreText(scoreOption)}
+                    </button>
+                  );
+                })}
+              </div>
+            </section>
+
+            {interactionHint ? (
+              <p className="rounded-[var(--radius-default)] border border-slate-200 bg-slate-50 px-3 py-2 text-[0.84rem] text-slate-600">
+                {interactionHint}
+              </p>
+            ) : null}
+          </div>
+        </div>
+
+        <div className="sticky bottom-0 border-t border-slate-200/80 bg-white px-4 py-4 md:px-5 md:py-4">
+          <button
+            className="inline-flex min-h-11 w-full items-center justify-center rounded-[var(--radius-default)] border border-blue-500 bg-blue-500 px-4 text-[0.92rem] font-semibold text-white transition hover:bg-blue-600 disabled:cursor-not-allowed disabled:border-blue-300 disabled:bg-blue-300"
+            disabled={!isFormValid || isSubmitting}
+            onClick={handleSubmit}
+            type="button"
+          >
+            Сохранить результат
+          </button>
+        </div>
+      </section>
     </div>
   );
 }
@@ -605,8 +1216,11 @@ export function TournamentDetailSheet({
   const [isParticipantsExpanded, setIsParticipantsExpanded] = useState(false);
   const [showCancelConfirm, setShowCancelConfirm] = useState(false);
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
+  const [resultMatch, setResultMatch] = useState<BracketMatchItem | null>(null);
+  const [winnerCelebration, setWinnerCelebration] = useState<WinnerCelebrationData | null>(null);
   const statusUi = getStatusUi(competition.status);
   const participantFieldRef = useRef<HTMLDivElement | null>(null);
+  const celebrationStorageKey = `sidequest:tournament-winner:${competition.id}`;
 
   const locationDisplay =
     competition.location && competition.location.trim().length > 0
@@ -618,6 +1232,10 @@ export function TournamentDetailSheet({
   const isModal = presentation === "modal";
   const canCancelTournament =
     !canManageDraft &&
+    competition.status === "in_progress" &&
+    (viewer.role === "admin" ||
+      (viewer.role === "organizer" && competition.createdByProfileId === viewer.profileId));
+  const canReportResults =
     competition.status === "in_progress" &&
     (viewer.role === "admin" ||
       (viewer.role === "organizer" && competition.createdByProfileId === viewer.profileId));
@@ -701,8 +1319,49 @@ export function TournamentDetailSheet({
     };
   }, [canManageDraft, isParticipantListOpen]);
 
+  useEffect(() => {
+    if (competition.status !== "completed" || winnerCelebration !== null) {
+      return;
+    }
+
+    const serialized = window.sessionStorage.getItem(celebrationStorageKey);
+
+    if (!serialized) {
+      return;
+    }
+
+    let frameId: number | null = null;
+
+    try {
+      const parsedData = JSON.parse(serialized) as WinnerCelebrationData;
+      window.sessionStorage.removeItem(celebrationStorageKey);
+      frameId = window.requestAnimationFrame(() => {
+        setWinnerCelebration(parsedData);
+      });
+    } catch {
+      window.sessionStorage.removeItem(celebrationStorageKey);
+      return;
+    }
+
+    return () => {
+      if (frameId !== null) {
+        window.cancelAnimationFrame(frameId);
+      }
+    };
+  }, [celebrationStorageKey, competition.status, winnerCelebration]);
+
   function handleRefresh() {
     router.refresh();
+  }
+
+  function handleOpenWinnerCelebration(match: BracketMatchItem) {
+    const celebrationData = createWinnerCelebrationData(match);
+
+    if (!celebrationData) {
+      return;
+    }
+
+    setWinnerCelebration(celebrationData);
   }
 
   function runMutation(task: () => Promise<{ ok: boolean; message?: string }>, onSuccess?: () => void) {
@@ -783,6 +1442,7 @@ export function TournamentDetailSheet({
                   locationDisplay={locationDisplay}
                   locationValue={locationValue}
                   matchFormat={matchFormat}
+                  organizerDisplay={organizerDisplay}
                   onDateChange={setDateValue}
                   onLocationChange={setLocationValue}
                   onMatchFormatChange={setMatchFormat}
@@ -985,7 +1645,13 @@ export function TournamentDetailSheet({
 
                 {bracket.length > 0 ? (
                   <div className="mt-4 md:mt-3">
-                    <BracketView bracket={bracket} />
+                    <BracketView
+                      bracket={bracket}
+                      canOpenWinnerCelebration={competition.status === "completed"}
+                      canReportResults={canReportResults}
+                      onOpenWinnerCelebration={handleOpenWinnerCelebration}
+                      onReportResult={setResultMatch}
+                    />
                   </div>
                 ) : (
                   <div className="mt-4 rounded-[var(--radius-default)] border border-dashed border-slate-200 bg-slate-50/70 px-4 py-6 text-center md:mt-3 md:px-[0.875rem] md:py-[1.125rem]">
@@ -1134,6 +1800,66 @@ export function TournamentDetailSheet({
           </section>
         </div>
       ) : null}
+
+      <TournamentMatchResultSheet
+        key={resultMatch?.id ?? "closed"}
+        isOpen={resultMatch !== null}
+        match={resultMatch}
+        matchFormat={competition.matchFormat}
+        onClose={() => setResultMatch(null)}
+        onSubmit={(payload) =>
+          saveTournamentMatchResultAction({
+            competitionId: competition.id,
+            competitionMatchId: payload.competitionMatchId,
+            score: payload.score,
+            winnerParticipantId: payload.winnerParticipantId,
+          }).then((result) => {
+            if (result.ok) {
+              const currentResultMatch = resultMatch;
+
+              if (
+                currentResultMatch &&
+                currentResultMatch.roundNumber === bracket.length
+              ) {
+                const celebrationData = createWinnerCelebrationData(currentResultMatch, {
+                  score: payload.score,
+                  winnerParticipantId: payload.winnerParticipantId,
+                  winnerName:
+                    payload.winnerParticipantId === currentResultMatch.slot1ParticipantId
+                      ? currentResultMatch.slot1DisplayName ?? undefined
+                      : currentResultMatch.slot2DisplayName ?? undefined,
+                  winnerSeed:
+                    payload.winnerParticipantId === currentResultMatch.slot1ParticipantId
+                      ? currentResultMatch.slot1Seed
+                      : currentResultMatch.slot2Seed,
+                });
+
+                if (celebrationData) {
+                  window.sessionStorage.setItem(
+                    celebrationStorageKey,
+                    JSON.stringify(celebrationData),
+                  );
+                  setWinnerCelebration(celebrationData);
+                }
+              }
+
+              setResultMatch(null);
+              handleRefresh();
+            }
+
+            return result;
+          })
+        }
+      />
+
+      <WinnerCelebrationOverlay
+        data={winnerCelebration}
+        isOpen={winnerCelebration !== null}
+        onClose={() => {
+          window.sessionStorage.removeItem(celebrationStorageKey);
+          setWinnerCelebration(null);
+        }}
+      />
     </>
   );
 }

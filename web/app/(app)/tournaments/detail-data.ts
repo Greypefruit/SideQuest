@@ -160,17 +160,20 @@ export async function getTournamentDetailData(
         matchNumber: match.competitionMatch.matchNumber,
         resolutionType: match.competitionMatch.resolutionType,
         roundNumber: match.competitionMatch.roundNumber,
+        slot1ParticipantId: match.competitionMatch.slot1ParticipantId,
         slot1Seed: match.competitionMatch.slot1ParticipantId
           ? seedMap.get(match.competitionMatch.slot1ParticipantId) ?? null
           : null,
         slot2Seed: match.competitionMatch.slot2ParticipantId
           ? seedMap.get(match.competitionMatch.slot2ParticipantId) ?? null
           : null,
+        slot2ParticipantId: match.competitionMatch.slot2ParticipantId,
         slot1Score: match.competitionMatch.slot1Score,
         slot2Score: match.competitionMatch.slot2Score,
         slot1DisplayName: match.slot1Profile?.displayName ?? null,
         slot2DisplayName: match.slot2Profile?.displayName ?? null,
         status: match.competitionMatch.status,
+        winnerParticipantId: match.competitionMatch.winnerParticipantId,
         winnerDisplayName: match.winnerProfile?.displayName ?? null,
       })),
     })),

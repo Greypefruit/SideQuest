@@ -6,20 +6,25 @@ import { and, eq } from "drizzle-orm";
 import { requireCurrentViewer } from "@/src/auth/current-viewer";
 import { db, schema } from "@/src/db";
 import {
+  ensureRankingExists,
   createCompetition,
+  getCompetitionMatchById,
   getCompetitionForManagement,
   getCompetitionParticipants,
   getDefaultActivityType,
   getParticipantById,
   isParticipantInCompetition,
   listCompetitionMatches,
+  updateRankingByParticipantId,
 } from "@/src/db/queries";
 
 const ALLOWED_MATCH_FORMATS = ["BO1", "BO3", "BO5"] as const;
 const MAX_TITLE_LENGTH = 255;
 const MAX_LOCATION_LENGTH = 255;
+const ELO_K_FACTOR = 32;
 
 type MatchFormat = (typeof ALLOWED_MATCH_FORMATS)[number];
+type WinnerKey = "player1" | "player2";
 
 function isAllowedMatchFormat(value: string): value is MatchFormat {
   return ALLOWED_MATCH_FORMATS.includes(value as MatchFormat);
@@ -103,6 +108,80 @@ function buildTournamentActionSuccess(message?: string) {
   return { message, ok: true as const };
 }
 
+function isValidCompletedScore(
+  format: MatchFormat,
+  score: {
+    player1: number;
+    player2: number;
+  },
+) {
+  const { player1, player2 } = score;
+
+  if (
+    !Number.isInteger(player1) ||
+    !Number.isInteger(player2) ||
+    player1 < 0 ||
+    player2 < 0
+  ) {
+    return false;
+  }
+
+  if (format === "BO1") {
+    return (
+      (player1 === 1 && player2 === 0) ||
+      (player1 === 0 && player2 === 1)
+    );
+  }
+
+  if (format === "BO3") {
+    return (
+      (player1 === 2 && (player2 === 0 || player2 === 1)) ||
+      (player2 === 2 && (player1 === 0 || player1 === 1))
+    );
+  }
+
+  return (
+    (player1 === 3 && (player2 === 0 || player2 === 1 || player2 === 2)) ||
+    (player2 === 3 && (player1 === 0 || player1 === 1 || player1 === 2))
+  );
+}
+
+function getWinnerByScore(score: { player1: number; player2: number }): WinnerKey | null {
+  if (score.player1 === score.player2) {
+    return null;
+  }
+
+  return score.player1 > score.player2 ? "player1" : "player2";
+}
+
+function calculateUpdatedRatings(
+  player1Rating: number,
+  player2Rating: number,
+  winner: WinnerKey,
+) {
+  const player1ActualScore = winner === "player1" ? 1 : 0;
+  const player1ExpectedScore =
+    1 / (1 + 10 ** ((player2Rating - player1Rating) / 400));
+  const player1Delta = Math.round(
+    ELO_K_FACTOR * (player1ActualScore - player1ExpectedScore),
+  );
+
+  return {
+    player1Rating: player1Rating + player1Delta,
+    player2Rating: player2Rating - player1Delta,
+  };
+}
+
+function getDefaultRankingValues(participantId: string) {
+  return {
+    participantId,
+    rating: 1000,
+    matchesPlayed: 0,
+    wins: 0,
+    losses: 0,
+  };
+}
+
 async function getManageableDraftCompetition(
   viewer: Awaited<ReturnType<typeof requireCurrentViewer>>,
   competitionId: string,
@@ -157,6 +236,26 @@ async function getManageableCompetition(
   }
 
   return { competitionData, ok: true as const, viewer };
+}
+
+async function getManageableInProgressCompetition(
+  viewer: Awaited<ReturnType<typeof requireCurrentViewer>>,
+  competitionId: string,
+  database: typeof db | Parameters<Parameters<typeof db.transaction>[0]>[0],
+) {
+  const competitionResult = await getManageableCompetition(viewer, competitionId, database);
+
+  if (!competitionResult.ok) {
+    return competitionResult;
+  }
+
+  if (competitionResult.competitionData.competition.status !== "in_progress") {
+    return buildTournamentActionError(
+      "Ввод результата доступен только для турнира в статусе «идет».",
+    );
+  }
+
+  return competitionResult;
 }
 
 type GeneratedBracketMatch = {
@@ -684,6 +783,212 @@ export async function cancelTournamentAction(input: { competitionId: string }) {
 
   revalidatePath("/tournaments");
   revalidatePath(`/tournaments/${input.competitionId}`);
+
+  return result;
+}
+
+export async function saveTournamentMatchResultAction(input: {
+  competitionId: string;
+  competitionMatchId: string;
+  score: {
+    player1: number;
+    player2: number;
+  };
+  winnerParticipantId: string;
+}) {
+  const viewer = await requireCurrentViewer();
+  const result = await db.transaction(async (tx) => {
+    const competitionResult = await getManageableInProgressCompetition(
+      viewer,
+      input.competitionId,
+      tx,
+    );
+
+    if (!competitionResult.ok) {
+      return competitionResult;
+    }
+
+    const competitionMatch = await getCompetitionMatchById(input.competitionMatchId, tx);
+
+    if (!competitionMatch) {
+      return buildTournamentActionError("Турнирный матч не найден.");
+    }
+
+    if (competitionMatch.competitionMatch.competitionId !== input.competitionId) {
+      return buildTournamentActionError("Матч не принадлежит указанному турниру.");
+    }
+
+    if (competitionMatch.competition.status !== "in_progress") {
+      return buildTournamentActionError(
+        "Ввод результата доступен только для турнира в статусе «идет».",
+      );
+    }
+
+    if (competitionMatch.competitionMatch.status === "completed") {
+      return buildTournamentActionError("Результат этого матча уже сохранен.");
+    }
+
+    if (competitionMatch.competitionMatch.resolutionType === "bye") {
+      return buildTournamentActionError("Матч с автопроходом не требует ручного результата.");
+    }
+
+    const slot1ParticipantId = competitionMatch.competitionMatch.slot1ParticipantId;
+    const slot2ParticipantId = competitionMatch.competitionMatch.slot2ParticipantId;
+
+    if (!slot1ParticipantId || !slot2ParticipantId) {
+      return buildTournamentActionError(
+        "Результат можно внести только после определения обоих участников матча.",
+      );
+    }
+
+    if (
+      input.winnerParticipantId !== slot1ParticipantId &&
+      input.winnerParticipantId !== slot2ParticipantId
+    ) {
+      return buildTournamentActionError("Победитель должен быть одним из участников матча.");
+    }
+
+    const matchFormat = competitionMatch.competition.matchFormat;
+
+    if (!isAllowedMatchFormat(matchFormat)) {
+      throw new Error("Unsupported competition match format");
+    }
+
+    if (!isValidCompletedScore(matchFormat, input.score)) {
+      return buildTournamentActionError("Итоговый счет не соответствует формату матча.");
+    }
+
+    const winnerByScore = getWinnerByScore(input.score);
+
+    if (!winnerByScore) {
+      return buildTournamentActionError("Ничья в турнирном матче не поддерживается.");
+    }
+
+    const expectedWinnerParticipantId =
+      winnerByScore === "player1" ? slot1ParticipantId : slot2ParticipantId;
+
+    if (expectedWinnerParticipantId !== input.winnerParticipantId) {
+      return buildTournamentActionError("Победитель должен соответствовать итоговому счету.");
+    }
+
+    const [updatedMatch] = await tx
+      .update(schema.competitionMatches)
+      .set({
+        slot1Score: input.score.player1,
+        slot2Score: input.score.player2,
+        winnerParticipantId: input.winnerParticipantId,
+        status: "completed",
+        resolutionType: "played",
+        reportedByProfileId: viewer.profileId,
+        completedAt: new Date(),
+        updatedAt: new Date(),
+      })
+      .where(
+        and(
+          eq(schema.competitionMatches.id, input.competitionMatchId),
+          eq(schema.competitionMatches.status, "pending"),
+        ),
+      )
+      .returning();
+
+    if (!updatedMatch) {
+      return buildTournamentActionError("Результат этого матча уже был сохранен ранее.");
+    }
+
+    const slot1Ranking = await ensureRankingExists(
+      getDefaultRankingValues(slot1ParticipantId),
+      tx,
+    );
+    const slot2Ranking = await ensureRankingExists(
+      getDefaultRankingValues(slot2ParticipantId),
+      tx,
+    );
+
+    if (!slot1Ranking || !slot2Ranking) {
+      throw new Error("Failed to provision rankings for tournament match participants");
+    }
+
+    const updatedRatings = calculateUpdatedRatings(
+      slot1Ranking.rating,
+      slot2Ranking.rating,
+      winnerByScore,
+    );
+
+    await updateRankingByParticipantId(
+      slot1ParticipantId,
+      {
+        rating: updatedRatings.player1Rating,
+        matchesPlayed: slot1Ranking.matchesPlayed + 1,
+        wins: slot1Ranking.wins + (winnerByScore === "player1" ? 1 : 0),
+        losses: slot1Ranking.losses + (winnerByScore === "player2" ? 1 : 0),
+      },
+      tx,
+    );
+
+    await updateRankingByParticipantId(
+      slot2ParticipantId,
+      {
+        rating: updatedRatings.player2Rating,
+        matchesPlayed: slot2Ranking.matchesPlayed + 1,
+        wins: slot2Ranking.wins + (winnerByScore === "player2" ? 1 : 0),
+        losses: slot2Ranking.losses + (winnerByScore === "player1" ? 1 : 0),
+      },
+      tx,
+    );
+
+    if (competitionMatch.competitionMatch.nextMatchId && competitionMatch.competitionMatch.nextMatchSlot) {
+      const nextMatch = await getCompetitionMatchById(
+        competitionMatch.competitionMatch.nextMatchId,
+        tx,
+      );
+
+      if (!nextMatch) {
+        return buildTournamentActionError("Не удалось найти следующий матч сетки.");
+      }
+
+      if (nextMatch.competitionMatch.competitionId !== input.competitionId) {
+        return buildTournamentActionError("Следующий матч относится к другому турниру.");
+      }
+
+      const slotField =
+        competitionMatch.competitionMatch.nextMatchSlot === 1
+          ? "slot1ParticipantId"
+          : "slot2ParticipantId";
+      const existingParticipantId = nextMatch.competitionMatch[slotField];
+
+      if (existingParticipantId && existingParticipantId !== input.winnerParticipantId) {
+        return buildTournamentActionError(
+          "Сетка уже содержит другого участника в следующем слоте.",
+        );
+      }
+
+      if (!existingParticipantId) {
+        await tx
+          .update(schema.competitionMatches)
+          .set({
+            [slotField]: input.winnerParticipantId,
+            updatedAt: new Date(),
+          })
+          .where(eq(schema.competitionMatches.id, nextMatch.competitionMatch.id));
+      }
+    } else {
+      await tx
+        .update(schema.competitions)
+        .set({
+          status: "completed",
+          completedAt: new Date(),
+          updatedAt: new Date(),
+        })
+        .where(eq(schema.competitions.id, input.competitionId));
+    }
+
+    return buildTournamentActionSuccess("Результат матча сохранен.");
+  });
+
+  revalidatePath("/tournaments");
+  revalidatePath(`/tournaments/${input.competitionId}`);
+  revalidatePath("/ranking");
+  revalidatePath("/profile");
 
   return result;
 }

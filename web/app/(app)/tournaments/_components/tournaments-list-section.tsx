@@ -340,7 +340,7 @@ function TabLink({ href, label, active }: { href: string; label: string; active:
   return (
     <Link
       href={href}
-      className={`inline-flex min-h-11 items-center rounded-[var(--radius-default)] px-3.5 text-[0.92rem] font-semibold transition md:min-h-10 md:px-3 md:text-[0.86rem] ${
+      className={`inline-flex min-h-11 min-w-[4.9rem] items-center justify-center rounded-[var(--radius-default)] px-5 text-[0.92rem] font-semibold transition md:min-h-10 md:min-w-[4.6rem] md:px-[1.05rem] md:text-[0.86rem] ${
         active
           ? "bg-blue-500 text-white"
           : "bg-slate-100 text-slate-600 hover:bg-slate-200"
