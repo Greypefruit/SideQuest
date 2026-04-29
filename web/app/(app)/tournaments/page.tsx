@@ -8,6 +8,8 @@ import {
   listCompetitionsVisibleToOrganizerAll,
 } from "@/src/db/queries";
 import { CreateTournamentSheetInner } from "./_components/create-tournament-sheet";
+import { TournamentDetailSheet } from "./_components/tournament-detail-sheet";
+import { getTournamentDetailData } from "./detail-data";
 
 const ADMIN_VISIBLE_STATUSES = ["draft", "in_progress", "completed"] as const;
 const PLAYER_VISIBLE_STATUSES = ["in_progress", "completed"] as const;
@@ -17,6 +19,7 @@ type TournamentTab = "my" | "all";
 
 type TournamentsPageProps = {
   searchParams?: Promise<{
+    competition?: string | string[] | undefined;
     create?: string | string[] | undefined;
     page?: string | string[] | undefined;
     tab?: string | string[] | undefined;
@@ -24,6 +27,7 @@ type TournamentsPageProps = {
 };
 
 type TournamentsSearchParams = {
+  competition?: string | string[] | undefined;
   create?: string | string[] | undefined;
   page?: string | string[] | undefined;
   tab?: string | string[] | undefined;
@@ -64,33 +68,39 @@ function isCreateSheetOpen(value: string | undefined) {
 }
 
 function buildCreateHref(activeTab: TournamentTab, page: number) {
-  const params = new URLSearchParams();
+  return buildTournamentsHref(activeTab, page, { create: true });
+}
 
-  params.set("tab", activeTab);
-  params.set("create", "1");
-
-  if (page > 1) {
-    params.set("page", String(page));
-  }
-
-  return `/tournaments?${params.toString()}`;
+function buildCompetitionHref(activeTab: TournamentTab, page: number, competitionId: string) {
+  return buildTournamentsHref(activeTab, page, { competitionId });
 }
 
 function buildListHref(activeTab: TournamentTab, page: number) {
   return buildTournamentsHref(activeTab, page);
 }
 
-function buildTournamentsHref(activeTab: TournamentTab, page: number) {
+function buildTournamentsHref(
+  activeTab: TournamentTab,
+  page: number,
+  options?: {
+    competitionId?: string;
+    create?: boolean;
+  },
+) {
   const params = new URLSearchParams();
 
-  if (activeTab === "all") {
-    params.set("tab", "all");
-  } else {
-    params.set("tab", "my");
-  }
+  params.set("tab", activeTab);
 
   if (page > 1) {
     params.set("page", String(page));
+  }
+
+  if (options?.create) {
+    params.set("create", "1");
+  }
+
+  if (options?.competitionId) {
+    params.set("competition", options.competitionId);
   }
 
   const query = params.toString();
@@ -238,6 +248,8 @@ function formatTournamentScheduledAt(value: string | Date | null | undefined) {
 }
 
 type TournamentCardProps = {
+  desktopHref: string;
+  mobileHref: string;
   title: string;
   matchFormat: "BO1" | "BO3" | "BO5";
   participantsCount: number;
@@ -246,6 +258,8 @@ type TournamentCardProps = {
 };
 
 function TournamentCard({
+  desktopHref,
+  mobileHref,
   title,
   matchFormat,
   participantsCount,
@@ -256,7 +270,18 @@ function TournamentCard({
   const scheduledAtText = formatTournamentScheduledAt(scheduledAt);
 
   return (
-    <article className="rounded-[var(--radius-default)] border border-[#D9E2F0] bg-white px-4 py-4 shadow-[0_10px_24px_rgba(15,23,42,0.03)] transition-[background-color,border-color,transform] duration-150 ease-out hover:-translate-y-px hover:border-blue-200 hover:bg-blue-50 active:border-blue-300 active:bg-blue-100">
+    <article className="relative rounded-[var(--radius-default)] border border-[#D9E2F0] bg-white px-4 py-4 shadow-[0_10px_24px_rgba(15,23,42,0.03)] transition-[background-color,border-color,transform] duration-150 ease-out hover:-translate-y-px hover:border-blue-200 hover:bg-blue-50 active:border-blue-300 active:bg-blue-100">
+      <Link
+        aria-label={`Открыть турнир «${title}»`}
+        className="absolute inset-0 z-10 md:hidden"
+        href={mobileHref}
+      />
+      <Link
+        aria-label={`Открыть турнир «${title}»`}
+        className="absolute inset-0 z-10 hidden md:block"
+        href={desktopHref}
+      />
+
       <div className="flex items-start justify-between gap-4 md:gap-6">
         <div className="min-w-0 flex-1">
           <div className="flex items-start gap-3">
@@ -414,8 +439,7 @@ function TabLink({ href, label, active }: TabLinkProps) {
 
 export default async function TournamentsPage({ searchParams }: TournamentsPageProps) {
   const viewer = await requireCurrentViewer();
-  const params: TournamentsSearchParams =
-    (await searchParams) ?? {};
+  const params: TournamentsSearchParams = (await searchParams) ?? {};
   const activityType = await getDefaultActivityType();
 
   if (!activityType) {
@@ -427,10 +451,22 @@ export default async function TournamentsPage({ searchParams }: TournamentsPageP
   const isOrganizer = viewer.role === "organizer";
   const activeTab = isManager ? parseTournamentTab(getSingleSearchParam(params.tab)) : "all";
   const requestedPage = parsePositivePage(getSingleSearchParam(params.page));
-  const createSheetOpen = isManager && isCreateSheetOpen(getSingleSearchParam(params.create));
+  const selectedCompetitionId = getSingleSearchParam(params.competition);
+  const closeDetailHref = buildListHref(activeTab, requestedPage ?? 1);
+  const detailData = selectedCompetitionId
+    ? await getTournamentDetailData(viewer, selectedCompetitionId)
+    : null;
+  const createSheetOpen =
+    isManager &&
+    !selectedCompetitionId &&
+    isCreateSheetOpen(getSingleSearchParam(params.create));
 
   if (getSingleSearchParam(params.page) !== undefined && requestedPage === null) {
     redirect(buildListHref(activeTab, 1));
+  }
+
+  if (selectedCompetitionId && !detailData) {
+    redirect(closeDetailHref);
   }
 
   const [allCompetitions, myCompetitions] = await Promise.all([
@@ -552,13 +588,19 @@ export default async function TournamentsPage({ searchParams }: TournamentsPageP
                 <section className="space-y-3">
                   {currentCompetitions.map((entry) => (
                     <TournamentCard
-                    key={entry.competition.id}
-                    matchFormat={entry.competition.matchFormat}
-                    participantsCount={entry.participantsCount}
-                    scheduledAt={entry.competition.scheduledAt}
-                    status={entry.competition.status as "draft" | "in_progress" | "completed"}
-                    title={entry.competition.title}
-                  />
+                      key={entry.competition.id}
+                      desktopHref={buildCompetitionHref(
+                        activeTab,
+                        currentPage,
+                        entry.competition.id,
+                      )}
+                      matchFormat={entry.competition.matchFormat}
+                      mobileHref={`/tournaments/${entry.competition.id}`}
+                      participantsCount={entry.participantsCount}
+                      scheduledAt={entry.competition.scheduledAt}
+                      status={entry.competition.status as "draft" | "in_progress" | "completed"}
+                      title={entry.competition.title}
+                    />
                   ))}
                 </section>
 
@@ -578,6 +620,33 @@ export default async function TournamentsPage({ searchParams }: TournamentsPageP
       </div>
 
       {createSheetOpen ? <CreateTournamentSheetInner closeHref={closeCreateHref} /> : null}
+      {detailData ? (
+        <TournamentDetailSheet
+          bracket={detailData.bracket}
+          canManageDraft={detailData.canManageDraft}
+          closeHref={buildListHref(activeTab, currentPage)}
+          competition={{
+            activityName: detailData.competitionData.activityType.nameRu,
+            createdByProfileId: detailData.competitionData.competition.createdByProfileId,
+            id: detailData.competitionData.competition.id,
+            location: detailData.competitionData.competition.location,
+            matchFormat: detailData.competitionData.competition.matchFormat,
+            organizerName: detailData.competitionData.owner.displayName,
+            scheduledAt: detailData.competitionData.competition.scheduledAt
+              ? detailData.competitionData.competition.scheduledAt.toISOString()
+              : null,
+            status: detailData.competitionData.competition.status as
+              | "draft"
+              | "in_progress"
+              | "completed",
+            title: detailData.competitionData.competition.title,
+          }}
+          participantOptions={detailData.participantOptions}
+          participants={detailData.participants}
+          presentation="modal"
+          viewer={viewer}
+        />
+      ) : null}
     </div>
   );
 }

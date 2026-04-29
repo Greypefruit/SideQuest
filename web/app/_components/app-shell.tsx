@@ -88,6 +88,7 @@ function getPageTitle(pathname: string) {
 
 export function AppShell({ viewer, children }: AppShellProps) {
   const pathname = usePathname();
+  const isTournamentDetailPage = /^\/tournaments\/[^/]+$/.test(pathname);
   const desktopNavItems =
     viewer.role === "admin" ? [...primaryNavItems, adminNavItem] : primaryNavItems;
   const mobileAdminAction =
@@ -122,7 +123,11 @@ export function AppShell({ viewer, children }: AppShellProps) {
           </nav>
         </div>
 
-        <div className="mx-auto flex max-w-6xl items-center justify-between gap-4 px-4 py-4 md:hidden">
+        <div
+          className={`mx-auto max-w-6xl items-center justify-between gap-4 px-4 py-4 md:hidden ${
+            isTournamentDetailPage ? "hidden" : "flex"
+          }`}
+        >
           <div className="min-w-0">
             <p className="truncate text-[1.75rem] font-semibold tracking-tight text-slate-950">
               {getPageTitle(pathname)}
@@ -140,11 +145,19 @@ export function AppShell({ viewer, children }: AppShellProps) {
         </div>
       </header>
 
-      <main className="mx-auto flex min-h-[calc(100vh-4.5rem)] w-full max-w-6xl flex-col px-4 py-6 pb-28 md:px-6 md:py-8 md:pb-10">
+      <main
+        className={`mx-auto flex min-h-[calc(100vh-4.5rem)] w-full max-w-6xl flex-col md:px-6 md:py-8 md:pb-10 ${
+          isTournamentDetailPage ? "px-0 py-0 pb-0" : "px-4 py-6 pb-28"
+        }`}
+      >
         {children}
       </main>
 
-      <div className="fixed inset-x-0 bottom-0 z-40 border-t border-slate-200/80 bg-white/95 backdrop-blur md:hidden">
+      <div
+        className={`fixed inset-x-0 bottom-0 z-40 border-t border-slate-200/80 bg-white/95 backdrop-blur md:hidden ${
+          isTournamentDetailPage ? "hidden" : "block"
+        }`}
+      >
         <nav
           aria-label="Нижняя навигация"
           className="mx-auto grid max-w-xl grid-cols-5 gap-1 px-2 pb-[calc(env(safe-area-inset-bottom)+0.5rem)] pt-2"
