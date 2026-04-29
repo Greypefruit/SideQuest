@@ -38,7 +38,8 @@ export default async function TournamentDetailPage({
         status: detailData.competitionData.competition.status as
           | "draft"
           | "in_progress"
-          | "completed",
+          | "completed"
+          | "cancelled",
         title: detailData.competitionData.competition.title,
       }}
       participantOptions={detailData.participantOptions}

@@ -117,7 +117,7 @@ export async function listCompetitionsVisibleToOrganizerAll(
       and(
         eq(competitions.activityTypeId, activityTypeId),
         or(
-          inArray(competitions.status, ["in_progress", "completed"]),
+          inArray(competitions.status, ["in_progress", "completed", "cancelled"]),
           and(
             eq(competitions.status, "draft"),
             eq(competitions.createdByProfileId, ownerProfileId),

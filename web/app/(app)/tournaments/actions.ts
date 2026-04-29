@@ -134,6 +134,31 @@ async function getManageableDraftCompetition(
   return { competitionData, ok: true as const, viewer };
 }
 
+async function getManageableCompetition(
+  viewer: Awaited<ReturnType<typeof requireCurrentViewer>>,
+  competitionId: string,
+  database: typeof db | Parameters<Parameters<typeof db.transaction>[0]>[0],
+) {
+  const competitionData = await getCompetitionForManagement(competitionId, database);
+
+  if (!competitionData) {
+    return buildTournamentActionError("Турнир не найден.");
+  }
+
+  if (viewer.role !== "organizer" && viewer.role !== "admin") {
+    return buildTournamentActionError("У вас нет прав для управления турниром.");
+  }
+
+  if (
+    viewer.role === "organizer" &&
+    competitionData.competition.createdByProfileId !== viewer.profileId
+  ) {
+    return buildTournamentActionError("Организатор может управлять только своим турниром.");
+  }
+
+  return { competitionData, ok: true as const, viewer };
+}
+
 type GeneratedBracketMatch = {
   completedAt: Date | null;
   competitionId: string;
@@ -608,6 +633,57 @@ export async function deleteTournamentDraftAction(input: { competitionId: string
   });
 
   revalidatePath("/tournaments");
+
+  return result;
+}
+
+export async function cancelTournamentAction(input: { competitionId: string }) {
+  const viewer = await requireCurrentViewer();
+  const result = await db.transaction(async (tx) => {
+    const competitionResult = await getManageableCompetition(
+      viewer,
+      input.competitionId,
+      tx,
+    );
+
+    if (!competitionResult.ok) {
+      return competitionResult;
+    }
+
+    const competitionStatus = competitionResult.competitionData.competition.status;
+
+    if (competitionStatus !== "in_progress") {
+      return buildTournamentActionError(
+        "Отмена доступна только для турнира в статусе «идет».",
+      );
+    }
+
+    const existingMatches = await listCompetitionMatches(input.competitionId, tx);
+    const hasPlayedCompletedMatches = existingMatches.some(
+      (match) =>
+        match.competitionMatch.status === "completed" &&
+        match.competitionMatch.resolutionType === "played",
+    );
+
+    if (hasPlayedCompletedMatches) {
+      return buildTournamentActionError(
+        "Нельзя отменить турнир после уже сыгранных матчей.",
+      );
+    }
+
+    await tx
+      .update(schema.competitions)
+      .set({
+        status: "cancelled",
+        updatedAt: new Date(),
+      })
+      .where(eq(schema.competitions.id, input.competitionId));
+
+    return buildTournamentActionSuccess("Турнир отменен.");
+  });
+
+  revalidatePath("/tournaments");
+  revalidatePath(`/tournaments/${input.competitionId}`);
 
   return result;
 }

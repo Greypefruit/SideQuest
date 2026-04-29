@@ -6,6 +6,7 @@ import { useEffect, useMemo, useRef, useState, useTransition } from "react";
 import type { AuthenticatedViewer } from "@/src/auth/current-viewer";
 import {
   addTournamentParticipantAction,
+  cancelTournamentAction,
   deleteTournamentDraftAction,
   generateTournamentBracketAction,
   removeTournamentParticipantAction,
@@ -13,7 +14,7 @@ import {
 } from "../actions";
 
 type MatchFormat = "BO1" | "BO3" | "BO5";
-type TournamentStatus = "draft" | "in_progress" | "completed";
+type TournamentStatus = "draft" | "in_progress" | "completed" | "cancelled";
 
 type ParticipantItem = {
   competitionParticipantId: string;
@@ -149,6 +150,11 @@ function getStatusUi(status: TournamentStatus) {
       return {
         className: "bg-slate-200 text-slate-700",
         label: "ЗАВЕРШЕН",
+      };
+    case "cancelled":
+      return {
+        className: "border border-red-200 bg-red-50 text-red-700",
+        label: "ОТМЕНЕН",
       };
   }
 }
@@ -581,6 +587,7 @@ export function TournamentDetailSheet({
   participantOptions,
   participants,
   presentation,
+  viewer,
 }: TournamentDetailSheetProps) {
   const router = useRouter();
   const [isPending, startTransition] = useTransition();
@@ -595,6 +602,8 @@ export function TournamentDetailSheet({
   );
   const [participantQuery, setParticipantQuery] = useState("");
   const [isParticipantListOpen, setIsParticipantListOpen] = useState(false);
+  const [isParticipantsExpanded, setIsParticipantsExpanded] = useState(false);
+  const [showCancelConfirm, setShowCancelConfirm] = useState(false);
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
   const statusUi = getStatusUi(competition.status);
   const participantFieldRef = useRef<HTMLDivElement | null>(null);
@@ -607,6 +616,15 @@ export function TournamentDetailSheet({
   const timeDisplay = formatScheduledTime(competition.scheduledAt);
   const canGenerateBracket = canManageDraft && participants.length >= 2 && bracket.length === 0;
   const isModal = presentation === "modal";
+  const canCancelTournament =
+    !canManageDraft &&
+    competition.status === "in_progress" &&
+    (viewer.role === "admin" ||
+      (viewer.role === "organizer" && competition.createdByProfileId === viewer.profileId));
+  const shouldCollapseParticipants = !canManageDraft && participants.length > 2;
+  const visibleParticipants = shouldCollapseParticipants && !isParticipantsExpanded
+    ? participants.slice(0, 2)
+    : participants;
 
   const participantsCountLabel = useMemo(
     () => formatParticipantsLabel(participants.length),
@@ -893,7 +911,7 @@ export function TournamentDetailSheet({
 
                 {participants.length > 0 ? (
                   <div className="mt-4 space-y-2.5 md:mt-3 md:space-y-2">
-                    {participants.map((participant) => (
+                    {visibleParticipants.map((participant) => (
                       <div
                         key={participant.competitionParticipantId}
                         className="flex items-center justify-between gap-3 rounded-[var(--radius-default)] border border-slate-200 bg-slate-50/70 px-3 py-3 md:px-2.5 md:py-2.5"
@@ -930,6 +948,18 @@ export function TournamentDetailSheet({
                         ) : null}
                       </div>
                     ))}
+
+                    {shouldCollapseParticipants ? (
+                      <button
+                        className="inline-flex min-h-10 items-center justify-center self-start rounded-[var(--radius-default)] px-1 text-[0.88rem] font-medium text-blue-600 transition hover:text-blue-700"
+                        onClick={() => setIsParticipantsExpanded((current) => !current)}
+                        type="button"
+                      >
+                        {isParticipantsExpanded
+                          ? "Свернуть"
+                          : `Показать еще ${participants.length - 2}`}
+                      </button>
+                    ) : null}
                   </div>
                 ) : (
                   <div className="mt-4 rounded-[var(--radius-default)] border border-dashed border-slate-200 bg-slate-50/70 px-4 py-6 text-center md:mt-3 md:px-[0.875rem] md:py-[1.125rem]">
@@ -988,15 +1018,27 @@ export function TournamentDetailSheet({
                 ) : null}
               </section>
 
-              {canManageDraft ? (
-                <section className="pt-1">
-                  <button
-                    className="inline-flex min-h-11 w-full items-center justify-center rounded-[var(--radius-default)] border border-red-200 bg-red-50 px-4 text-[0.92rem] font-semibold text-red-700 transition hover:bg-red-100"
-                    onClick={() => setShowDeleteConfirm(true)}
-                    type="button"
-                  >
-                    Удалить турнир
-                  </button>
+              {canManageDraft || canCancelTournament ? (
+                <section className="space-y-2 pt-1">
+                  {canCancelTournament ? (
+                    <button
+                      className="inline-flex min-h-11 w-full items-center justify-center rounded-[var(--radius-default)] border border-red-200 bg-red-50 px-4 text-[0.92rem] font-semibold text-red-700 transition hover:bg-red-100"
+                      onClick={() => setShowCancelConfirm(true)}
+                      type="button"
+                    >
+                      Отменить турнир
+                    </button>
+                  ) : null}
+
+                  {canManageDraft ? (
+                    <button
+                      className="inline-flex min-h-11 w-full items-center justify-center rounded-[var(--radius-default)] border border-red-200 bg-red-50 px-4 text-[0.92rem] font-semibold text-red-700 transition hover:bg-red-100"
+                      onClick={() => setShowDeleteConfirm(true)}
+                      type="button"
+                    >
+                      Удалить турнир
+                    </button>
+                  ) : null}
                 </section>
               ) : null}
 
@@ -1046,6 +1088,47 @@ export function TournamentDetailSheet({
                 type="button"
               >
                 Удалить
+              </button>
+            </div>
+          </section>
+        </div>
+      ) : null}
+
+      {showCancelConfirm ? (
+        <div className="fixed inset-0 z-[60] bg-slate-950/38 px-4 py-6 md:flex md:items-center md:justify-center">
+          <section className="mx-auto mt-24 w-full max-w-[22rem] rounded-[var(--radius-default)] border border-slate-200 bg-white p-5 shadow-[0_20px_50px_rgba(15,23,42,0.16)] md:mt-0">
+            <h3 className="text-[1.05rem] font-semibold tracking-tight text-slate-900">
+              Отменить турнир?
+            </h3>
+            <p className="mt-2 text-[0.9rem] leading-6 text-slate-500">
+              Турнир будет переведен в статус «Отменен». Участники и история турнира сохранятся. Это действие нельзя отменить.
+            </p>
+
+            <div className="mt-5 flex gap-2">
+              <button
+                className="inline-flex min-h-10 flex-1 items-center justify-center rounded-[var(--radius-default)] border border-slate-200 bg-white px-4 text-[0.88rem] font-semibold text-slate-700 transition hover:bg-slate-50"
+                onClick={() => setShowCancelConfirm(false)}
+                type="button"
+              >
+                Назад
+              </button>
+              <button
+                className="inline-flex min-h-10 flex-1 items-center justify-center rounded-[var(--radius-default)] border border-red-200 bg-red-50 px-4 text-[0.88rem] font-semibold text-red-700 transition hover:bg-red-100"
+                disabled={isPending}
+                onClick={() =>
+                  runMutation(
+                    () =>
+                      cancelTournamentAction({
+                        competitionId: competition.id,
+                      }),
+                    () => {
+                      setShowCancelConfirm(false);
+                    },
+                  )
+                }
+                type="button"
+              >
+                Отменить турнир
               </button>
             </div>
           </section>

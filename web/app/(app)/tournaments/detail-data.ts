@@ -120,6 +120,37 @@ export async function getTournamentDetailData(
               : entry.displayName,
         }))
     : [];
+  const seededParticipants = participants
+    .map((entry, index) => ({
+      competitionParticipantId: entry.competitionParticipant.id,
+      displayName: entry.profile.displayName,
+      participantId: entry.participant.id,
+      rating: entry.ranking?.rating ?? null,
+      seed: seedMap.get(entry.participant.id) ?? null,
+      originalIndex: index,
+    }))
+    .sort((left, right) => {
+      if (left.seed !== null && right.seed !== null) {
+        return left.seed - right.seed;
+      }
+
+      if (left.seed !== null) {
+        return -1;
+      }
+
+      if (right.seed !== null) {
+        return 1;
+      }
+
+      return left.originalIndex - right.originalIndex;
+    })
+    .map((participant) => ({
+      competitionParticipantId: participant.competitionParticipantId,
+      displayName: participant.displayName,
+      participantId: participant.participantId,
+      rating: participant.rating,
+      seed: participant.seed,
+    }));
 
   return {
     bracket: bracket.map((round) => ({
@@ -146,12 +177,6 @@ export async function getTournamentDetailData(
     canManageDraft,
     competitionData,
     participantOptions,
-    participants: participants.map((entry) => ({
-      competitionParticipantId: entry.competitionParticipant.id,
-      displayName: entry.profile.displayName,
-      participantId: entry.participant.id,
-      rating: entry.ranking?.rating ?? null,
-      seed: seedMap.get(entry.participant.id) ?? null,
-    })),
+    participants: seededParticipants,
   };
 }

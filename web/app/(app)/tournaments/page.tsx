@@ -1,4 +1,3 @@
-import Link from "next/link";
 import { redirect } from "next/navigation";
 import { requireCurrentViewer } from "@/src/auth/current-viewer";
 import {
@@ -9,11 +8,13 @@ import {
 } from "@/src/db/queries";
 import { CreateTournamentSheetInner } from "./_components/create-tournament-sheet";
 import { TournamentDetailSheet } from "./_components/tournament-detail-sheet";
+import { TournamentsListSection } from "./_components/tournaments-list-section";
 import { getTournamentDetailData } from "./detail-data";
 
-const ADMIN_VISIBLE_STATUSES = ["draft", "in_progress", "completed"] as const;
+const ADMIN_VISIBLE_STATUSES = ["draft", "in_progress", "completed", "cancelled"] as const;
 const PLAYER_VISIBLE_STATUSES = ["in_progress", "completed"] as const;
-const TOURNAMENTS_PAGE_SIZE = 6;
+
+type CompetitionListEntry = Awaited<ReturnType<typeof listCompetitionsByActivity>>[number];
 
 type TournamentTab = "my" | "all";
 
@@ -67,14 +68,6 @@ function isCreateSheetOpen(value: string | undefined) {
   return value === "1";
 }
 
-function buildCreateHref(activeTab: TournamentTab, page: number) {
-  return buildTournamentsHref(activeTab, page, { create: true });
-}
-
-function buildCompetitionHref(activeTab: TournamentTab, page: number, competitionId: string) {
-  return buildTournamentsHref(activeTab, page, { competitionId });
-}
-
 function buildListHref(activeTab: TournamentTab, page: number) {
   return buildTournamentsHref(activeTab, page);
 }
@@ -108,119 +101,20 @@ function buildTournamentsHref(
   return query ? `/tournaments?${query}` : "/tournaments";
 }
 
-function formatParticipantsLabel(count: number) {
-  const normalized = Math.abs(count) % 100;
-  const lastDigit = normalized % 10;
-
-  if (normalized >= 11 && normalized <= 19) {
-    return `${count} участников`;
-  }
-
-  if (lastDigit === 1) {
-    return `${count} участник`;
-  }
-
-  if (lastDigit >= 2 && lastDigit <= 4) {
-    return `${count} участника`;
-  }
-
-  return `${count} участников`;
-}
-
-function PlusIcon() {
-  return (
-    <svg aria-hidden="true" fill="none" height="16" viewBox="0 0 16 16" width="16">
-      <path
-        d="M8 3v10M3 8h10"
-        stroke="currentColor"
-        strokeLinecap="round"
-        strokeLinejoin="round"
-        strokeWidth="1.7"
-      />
-    </svg>
-  );
-}
-
-type PaginationProps = {
-  currentPage: number;
-  totalItems: number;
-  totalPages: number;
-  pageSize: number;
-  activeTab: TournamentTab;
-};
-
-function Pagination({
-  currentPage,
-  totalItems,
-  totalPages,
-  pageSize,
-  activeTab,
-}: PaginationProps) {
-  const rangeStart = totalItems === 0 ? 0 : (currentPage - 1) * pageSize + 1;
-  const rangeEnd = totalItems === 0 ? 0 : Math.min(currentPage * pageSize, totalItems);
-
-  return (
-    <div className="flex flex-col items-center gap-2 rounded-[var(--radius-default)] border border-slate-200/90 bg-white px-3 py-2.5 shadow-[0_8px_18px_rgba(15,23,42,0.03)] sm:flex-row sm:items-center sm:justify-between md:px-3 md:py-2">
-      <p className="self-start text-[0.78rem] leading-5 text-slate-500 md:self-auto">
-        Показано {rangeStart}-{rangeEnd} из {totalItems}
-      </p>
-
-      <nav aria-label="Пагинация турниров" className="flex items-center justify-center gap-2">
-        {currentPage > 1 ? (
-          <Link
-            className="inline-flex min-h-8 items-center justify-center rounded-[var(--radius-default)] border border-slate-200 px-3 text-[0.78rem] font-medium text-slate-700 transition hover:border-slate-300 hover:bg-slate-50"
-            href={buildTournamentsHref(activeTab, currentPage - 1)}
-          >
-            Назад
-          </Link>
-        ) : (
-          <span className="inline-flex min-h-8 items-center justify-center rounded-[var(--radius-default)] border border-slate-200 bg-slate-50 px-3 text-[0.78rem] font-medium text-slate-400">
-            Назад
-          </span>
-        )}
-
-        <span className="inline-flex min-h-8 items-center justify-center rounded-[var(--radius-default)] border border-slate-200 bg-slate-100 px-3 text-[0.78rem] font-semibold text-slate-700">
-          {currentPage} / {totalPages}
-        </span>
-
-        {currentPage < totalPages ? (
-          <Link
-            className="inline-flex min-h-8 items-center justify-center rounded-[var(--radius-default)] border border-slate-200 px-3 text-[0.78rem] font-medium text-slate-700 transition hover:border-slate-300 hover:bg-slate-50"
-            href={buildTournamentsHref(activeTab, currentPage + 1)}
-          >
-            Вперед
-          </Link>
-        ) : (
-          <span className="inline-flex min-h-8 items-center justify-center rounded-[var(--radius-default)] border border-slate-200 bg-slate-50 px-3 text-[0.78rem] font-medium text-slate-400">
-            Вперед
-          </span>
-        )}
-      </nav>
-    </div>
-  );
-}
-
-function getStatusUi(status: "draft" | "in_progress" | "completed") {
+function getCompetitionStatusOrder(status: CompetitionListEntry["competition"]["status"]) {
   switch (status) {
-    case "draft":
-      return {
-        label: "ЧЕРНОВИК",
-        className: "border border-slate-300 bg-slate-100 text-slate-600",
-      };
     case "in_progress":
-      return {
-        label: "ИДЕТ",
-        className: "bg-blue-50 text-blue-700",
-      };
+      return 0;
+    case "draft":
+      return 1;
     case "completed":
-      return {
-        label: "ЗАВЕРШЕН",
-        className: "bg-slate-200 text-slate-700",
-      };
+      return 2;
+    case "cancelled":
+      return 3;
   }
 }
 
-function formatTournamentScheduledAt(value: string | Date | null | undefined) {
+function parseScheduledSortParts(value: Date | string | null) {
   if (!value) {
     return null;
   }
@@ -231,210 +125,105 @@ function formatTournamentScheduledAt(value: string | Date | null | undefined) {
     return null;
   }
 
-  const day = String(scheduledAt.getDate()).padStart(2, "0");
-  const month = String(scheduledAt.getMonth() + 1).padStart(2, "0");
-  const year = String(scheduledAt.getFullYear()).slice(-2);
-  const hours = String(scheduledAt.getHours()).padStart(2, "0");
-  const minutes = String(scheduledAt.getMinutes()).padStart(2, "0");
+  const startOfDay = new Date(
+    scheduledAt.getFullYear(),
+    scheduledAt.getMonth(),
+    scheduledAt.getDate(),
+    0,
+    0,
+    0,
+    0,
+  ).getTime();
+  const hasExplicitTime = scheduledAt.getHours() !== 0 || scheduledAt.getMinutes() !== 0;
 
-  const datePart = `${day}.${month}.${year}`;
-  const timePart = `${hours}:${minutes}`;
+  return {
+    dayTimestamp: startOfDay,
+    hasExplicitTime,
+    timestamp: scheduledAt.getTime(),
+  };
+}
 
-  if (hours === "00" && minutes === "00") {
-    return datePart;
+function compareDescDates(left: Date | null, right: Date | null) {
+  const leftTimestamp = left?.getTime() ?? Number.NEGATIVE_INFINITY;
+  const rightTimestamp = right?.getTime() ?? Number.NEGATIVE_INFINITY;
+
+  return rightTimestamp - leftTimestamp;
+}
+
+function compareScheduledCompetitions(left: CompetitionListEntry, right: CompetitionListEntry) {
+  const leftScheduled = parseScheduledSortParts(left.competition.scheduledAt);
+  const rightScheduled = parseScheduledSortParts(right.competition.scheduledAt);
+
+  if (leftScheduled && rightScheduled) {
+    if (leftScheduled.dayTimestamp !== rightScheduled.dayTimestamp) {
+      return leftScheduled.dayTimestamp - rightScheduled.dayTimestamp;
+    }
+
+    if (leftScheduled.hasExplicitTime !== rightScheduled.hasExplicitTime) {
+      return leftScheduled.hasExplicitTime ? -1 : 1;
+    }
+
+    if (leftScheduled.hasExplicitTime && rightScheduled.hasExplicitTime) {
+      if (leftScheduled.timestamp !== rightScheduled.timestamp) {
+        return leftScheduled.timestamp - rightScheduled.timestamp;
+      }
+    }
+  } else if (leftScheduled || rightScheduled) {
+    return leftScheduled ? -1 : 1;
   }
 
-  return `${datePart} · ${timePart}`;
+  const updatedAtComparison = compareDescDates(
+    left.competition.updatedAt,
+    right.competition.updatedAt,
+  );
+
+  if (updatedAtComparison !== 0) {
+    return updatedAtComparison;
+  }
+
+  return compareDescDates(left.competition.createdAt, right.competition.createdAt);
 }
 
-type TournamentCardProps = {
-  desktopHref: string;
-  mobileHref: string;
-  title: string;
-  matchFormat: "BO1" | "BO3" | "BO5";
-  participantsCount: number;
-  scheduledAt?: string | Date | null;
-  status: "draft" | "in_progress" | "completed";
-};
+function sortCompetitions(entries: CompetitionListEntry[]) {
+  return [...entries].sort((left, right) => {
+    const statusOrderDifference =
+      getCompetitionStatusOrder(left.competition.status) -
+      getCompetitionStatusOrder(right.competition.status);
 
-function TournamentCard({
-  desktopHref,
-  mobileHref,
-  title,
-  matchFormat,
-  participantsCount,
-  scheduledAt,
-  status,
-}: TournamentCardProps) {
-  const statusUi = getStatusUi(status);
-  const scheduledAtText = formatTournamentScheduledAt(scheduledAt);
+    if (statusOrderDifference !== 0) {
+      return statusOrderDifference;
+    }
 
-  return (
-    <article className="relative rounded-[var(--radius-default)] border border-[#D9E2F0] bg-white px-4 py-4 shadow-[0_10px_24px_rgba(15,23,42,0.03)] transition-[background-color,border-color,transform] duration-150 ease-out hover:-translate-y-px hover:border-blue-200 hover:bg-blue-50 active:border-blue-300 active:bg-blue-100">
-      <Link
-        aria-label={`Открыть турнир «${title}»`}
-        className="absolute inset-0 z-10 md:hidden"
-        href={mobileHref}
-      />
-      <Link
-        aria-label={`Открыть турнир «${title}»`}
-        className="absolute inset-0 z-10 hidden md:block"
-        href={desktopHref}
-      />
+    switch (left.competition.status) {
+      case "in_progress":
+      case "draft":
+        return compareScheduledCompetitions(left, right);
+      case "completed": {
+        const completionComparison = compareDescDates(
+          left.competition.completedAt ?? left.competition.updatedAt,
+          right.competition.completedAt ?? right.competition.updatedAt,
+        );
 
-      <div className="flex items-start justify-between gap-4 md:gap-6">
-        <div className="min-w-0 flex-1">
-          <div className="flex items-start gap-3">
-            <h2 className="max-w-[34rem] text-[1.05rem] font-semibold leading-6 tracking-tight text-slate-900 md:text-[1.15rem]">
-              {title}
-            </h2>
-          </div>
+        if (completionComparison !== 0) {
+          return completionComparison;
+        }
 
-          <p className="mt-2 text-[0.9rem] leading-6 text-slate-500">
-            Настольный теннис · На выбывание · {matchFormat}
-          </p>
+        return compareDescDates(left.competition.createdAt, right.competition.createdAt);
+      }
+      case "cancelled": {
+        const updatedAtComparison = compareDescDates(
+          left.competition.updatedAt,
+          right.competition.updatedAt,
+        );
 
-          <div className="mt-3 flex items-center gap-4">
-            <p className="inline-flex items-center gap-1.5 text-[0.84rem] font-medium text-slate-500">
-              <svg aria-hidden="true" fill="none" height="16" viewBox="0 0 16 16" width="16">
-                <path
-                  d="M5.333 6.333a2 2 0 1 1 0-4 2 2 0 0 1 0 4ZM10.667 7.667a1.667 1.667 0 1 0 0-3.334 1.667 1.667 0 0 0 0 3.334ZM2.667 12.667v-.334c0-1.472 1.194-2.666 2.666-2.666h.667c1.473 0 2.667 1.194 2.667 2.666v.334M9 12.667v-.334c0-1.104.895-2 2-2h.333c1.105 0 2 .896 2 2v.334"
-                  stroke="currentColor"
-                  strokeLinecap="round"
-                  strokeLinejoin="round"
-                  strokeWidth="1.2"
-                />
-              </svg>
-              {formatParticipantsLabel(participantsCount)}
-            </p>
-          </div>
-        </div>
+        if (updatedAtComparison !== 0) {
+          return updatedAtComparison;
+        }
 
-        <div className="shrink-0 self-stretch">
-          <div className="flex h-full min-w-[8rem] flex-col items-end justify-between gap-3 md:min-w-[8.5rem]">
-            {scheduledAtText ? (
-              <p className="whitespace-nowrap text-right text-[0.88rem] font-medium leading-5 text-slate-700 md:text-[0.9rem]">
-                {scheduledAtText}
-              </p>
-            ) : (
-              <span aria-hidden="true" />
-            )}
-
-            <span
-              className={`inline-flex min-h-5.5 items-center rounded-[var(--radius-default)] px-2.5 text-[0.56rem] font-semibold tracking-[0.08em] ${statusUi.className}`}
-            >
-              {statusUi.label}
-            </span>
-          </div>
-        </div>
-      </div>
-    </article>
-  );
-}
-
-type EmptyStateProps = {
-  title: string;
-  description: string;
-  showCreateButton: boolean;
-  variant: "manager" | "player";
-  createHref: string;
-};
-
-function EmptyState({
-  title,
-  description,
-  showCreateButton,
-  variant,
-  createHref,
-}: EmptyStateProps) {
-  const isPlayer = variant === "player";
-
-  return (
-    <section
-      className={`rounded-[var(--radius-default)] border border-slate-200/90 bg-white text-center shadow-[0_12px_28px_rgba(15,23,42,0.03)] ${
-        isPlayer ? "px-6 py-9 md:px-8 md:py-10" : "px-6 py-8 md:px-8 md:py-9"
-      }`}
-    >
-      <div
-        className={`mx-auto flex flex-col items-center justify-center ${
-          isPlayer ? "max-w-[22rem] gap-2.5" : "max-w-[24rem] gap-2"
-        }`}
-      >
-        <h2
-          className={`font-semibold tracking-tight text-slate-800 ${
-            isPlayer
-              ? "text-[1.1rem] leading-6 md:text-[1.15rem]"
-              : "text-[0.95rem] leading-5 md:text-[1rem]"
-          }`}
-        >
-          {title}
-        </h2>
-        <p
-          className={`text-slate-500 ${
-            isPlayer
-              ? "text-[0.88rem] leading-6 md:text-[0.9rem]"
-              : "text-[0.84rem] leading-5 md:text-[0.86rem]"
-          }`}
-        >
-          {description}
-        </p>
-
-        {showCreateButton ? (
-          <div className="mt-3">
-            <Link
-              href={createHref}
-              className="inline-flex min-h-11 w-full items-center justify-center gap-2 rounded-[var(--radius-default)] border border-blue-500 bg-blue-500 px-4 text-[0.92rem] font-semibold text-white transition hover:bg-blue-600 md:min-h-10 md:w-auto md:min-w-[170px] md:px-4 md:text-[0.86rem]"
-            >
-              <PlusIcon />
-              Создать турнир
-            </Link>
-          </div>
-        ) : null}
-      </div>
-    </section>
-  );
-}
-
-type ScopedEmptyStateProps = {
-  activeTab: TournamentTab;
-};
-
-function ScopedEmptyState({ activeTab }: ScopedEmptyStateProps) {
-  return (
-    <section className="rounded-[var(--radius-default)] border border-slate-200/90 bg-white px-5 py-7 text-center shadow-[0_10px_24px_rgba(15,23,42,0.03)]">
-      <div className="mx-auto flex max-w-[26rem] flex-col items-center justify-center">
-        <h2 className="text-[1rem] font-semibold tracking-tight text-slate-800">
-          {activeTab === "my" ? "У вас пока нет турниров" : "Список турниров пока пуст"}
-        </h2>
-        <p className="mt-1 whitespace-nowrap text-[0.9rem] leading-6 text-slate-500">
-          {activeTab === "my"
-            ? "Создайте первый турнир, чтобы он появился в разделе «Мои»."
-            : "Когда в системе появятся турниры, они будут отображаться здесь."}
-        </p>
-      </div>
-    </section>
-  );
-}
-
-type TabLinkProps = {
-  href: string;
-  label: string;
-  active: boolean;
-};
-
-function TabLink({ href, label, active }: TabLinkProps) {
-  return (
-    <Link
-      href={href}
-      className={`inline-flex min-h-11 items-center rounded-[var(--radius-default)] px-3.5 text-[0.92rem] font-semibold transition md:min-h-10 md:px-3 md:text-[0.86rem] ${
-        active
-          ? "bg-blue-500 text-white"
-          : "bg-slate-100 text-slate-600 hover:bg-slate-200"
-      }`}
-    >
-      {label}
-    </Link>
-  );
+        return compareDescDates(left.competition.createdAt, right.competition.createdAt);
+      }
+    }
+  });
 }
 
 export default async function TournamentsPage({ searchParams }: TournamentsPageProps) {
@@ -493,30 +282,14 @@ export default async function TournamentsPage({ searchParams }: TournamentsPageP
         )
       : Promise.resolve([]),
   ]);
+  const sortedAllCompetitions = sortCompetitions(allCompetitions);
+  const sortedMyCompetitions = sortCompetitions(myCompetitions);
 
-  const selectedCompetitions = isManager && activeTab === "my" ? myCompetitions : allCompetitions;
-  const hasAnyVisibleCompetitions = allCompetitions.length > 0;
-  const totalPages = Math.max(
-    1,
-    Math.ceil(selectedCompetitions.length / TOURNAMENTS_PAGE_SIZE),
-  );
-  const currentPage = Math.min(requestedPage ?? 1, totalPages);
-  const createHref = buildCreateHref(activeTab, currentPage);
+  const selectedCompetitions =
+    isManager && activeTab === "my" ? sortedMyCompetitions : sortedAllCompetitions;
+  const hasAnyVisibleCompetitions = sortedAllCompetitions.length > 0;
+  const currentPage = requestedPage ?? 1;
   const closeCreateHref = buildListHref(activeTab, currentPage);
-
-  if (
-    selectedCompetitions.length > 0 &&
-    getSingleSearchParam(params.page) !== undefined &&
-    currentPage !== (requestedPage ?? 1)
-  ) {
-    redirect(buildTournamentsHref(activeTab, currentPage));
-  }
-
-  const pageStartIndex = (currentPage - 1) * TOURNAMENTS_PAGE_SIZE;
-  const currentCompetitions = selectedCompetitions.slice(
-    pageStartIndex,
-    pageStartIndex + TOURNAMENTS_PAGE_SIZE,
-  );
 
   return (
     <div className="mx-auto w-full max-w-[1040px] min-w-0 overflow-x-hidden">
@@ -527,96 +300,25 @@ export default async function TournamentsPage({ searchParams }: TournamentsPageP
           </div>
         </header>
 
-        {!hasAnyVisibleCompetitions ? (
-          isManager ? (
-            <EmptyState
-              description="Создайте первый турнир, чтобы начать работу."
-              showCreateButton
-              title="Пока нет турниров"
-              variant="manager"
-              createHref={createHref}
-            />
-          ) : (
-            <EmptyState
-              description="Когда появятся новые турниры, они будут отображаться здесь."
-              showCreateButton={false}
-              title="Пока нет доступных турниров"
-              variant="player"
-              createHref={createHref}
-            />
-          )
-        ) : (
-          <div className="space-y-3">
-            {isManager ? (
-              <>
-                <div className="hidden items-center justify-between gap-4 md:flex">
-                  <nav aria-label="Фильтр турниров" className="flex items-center gap-2">
-                    <TabLink active={activeTab === "my"} href="/tournaments?tab=my" label="Мои" />
-                    <TabLink active={activeTab === "all"} href="/tournaments?tab=all" label="Все" />
-                  </nav>
-
-                  <Link
-                    href={createHref}
-                    className="inline-flex min-h-10 items-center justify-center gap-2 rounded-[var(--radius-default)] border border-blue-500 bg-blue-500 px-4 text-[0.86rem] font-semibold text-white transition hover:bg-blue-600"
-                  >
-                    <PlusIcon />
-                    Создать турнир
-                  </Link>
-                </div>
-
-                <div className="space-y-3 md:hidden">
-                  <nav aria-label="Фильтр турниров" className="flex items-center gap-2">
-                    <TabLink active={activeTab === "my"} href="/tournaments?tab=my" label="Мои" />
-                    <TabLink active={activeTab === "all"} href="/tournaments?tab=all" label="Все" />
-                  </nav>
-
-                  <Link
-                    href={createHref}
-                    className="inline-flex min-h-11 w-full items-center justify-center gap-2 rounded-[var(--radius-default)] border border-blue-500 bg-blue-500 px-4 text-[0.92rem] font-semibold text-white transition hover:bg-blue-600"
-                  >
-                    <PlusIcon />
-                    Создать турнир
-                  </Link>
-                </div>
-              </>
-            ) : null}
-
-            {selectedCompetitions.length === 0 ? (
-              <ScopedEmptyState activeTab={activeTab} />
-            ) : (
-              <>
-                <section className="space-y-3">
-                  {currentCompetitions.map((entry) => (
-                    <TournamentCard
-                      key={entry.competition.id}
-                      desktopHref={buildCompetitionHref(
-                        activeTab,
-                        currentPage,
-                        entry.competition.id,
-                      )}
-                      matchFormat={entry.competition.matchFormat}
-                      mobileHref={`/tournaments/${entry.competition.id}`}
-                      participantsCount={entry.participantsCount}
-                      scheduledAt={entry.competition.scheduledAt}
-                      status={entry.competition.status as "draft" | "in_progress" | "completed"}
-                      title={entry.competition.title}
-                    />
-                  ))}
-                </section>
-
-                {selectedCompetitions.length > 0 ? (
-                  <Pagination
-                    activeTab={activeTab}
-                    currentPage={currentPage}
-                    pageSize={TOURNAMENTS_PAGE_SIZE}
-                    totalItems={selectedCompetitions.length}
-                    totalPages={totalPages}
-                  />
-                ) : null}
-              </>
-            )}
-          </div>
-        )}
+        <TournamentsListSection
+          activeTab={activeTab}
+          entries={selectedCompetitions.map((entry) => ({
+            id: entry.competition.id,
+            matchFormat: entry.competition.matchFormat,
+            participantsCount: entry.participantsCount,
+            scheduledAt: entry.competition.scheduledAt
+              ? entry.competition.scheduledAt.toISOString()
+              : null,
+            status: entry.competition.status as
+              | "draft"
+              | "in_progress"
+              | "completed"
+              | "cancelled",
+            title: entry.competition.title,
+          }))}
+          hasAnyVisibleCompetitions={hasAnyVisibleCompetitions}
+          isManager={isManager}
+        />
       </div>
 
       {createSheetOpen ? <CreateTournamentSheetInner closeHref={closeCreateHref} /> : null}
@@ -638,7 +340,8 @@ export default async function TournamentsPage({ searchParams }: TournamentsPageP
             status: detailData.competitionData.competition.status as
               | "draft"
               | "in_progress"
-              | "completed",
+              | "completed"
+              | "cancelled",
             title: detailData.competitionData.competition.title,
           }}
           participantOptions={detailData.participantOptions}

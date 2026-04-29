@@ -1,6 +1,6 @@
 "use client";
 
-import { useDeferredValue, useState } from "react";
+import { useDeferredValue, useEffect, useState } from "react";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import type { AuthenticatedViewer } from "@/src/auth/current-viewer";
 import { createCompletedMatchAction } from "../actions";
@@ -32,7 +32,8 @@ type MatchesListViewProps = {
   viewer: AuthenticatedViewer;
 };
 
-const MATCHES_PAGE_SIZE = 6;
+const MATCHES_PAGE_SIZE_DESKTOP = 20;
+const MATCHES_PAGE_SIZE_MOBILE = 10;
 
 const FULL_NAME_BY_SHORT_NAME: Record<string, string> = {
   "Иванов А.": "Алексей Иванов",
@@ -260,7 +261,7 @@ function MobileMatchesCards({ matches }: MobileMatchesCardsProps) {
       {matches.map((match) => (
         <article
           key={match.id}
-          className="rounded-[var(--radius-default)] border border-slate-200/90 bg-white px-4 py-4 shadow-[0_10px_24px_rgba(15,23,42,0.03)]"
+          className="w-full rounded-[var(--radius-default)] border border-slate-200/90 bg-white px-3.5 py-2.5 shadow-[0_10px_24px_rgba(15,23,42,0.03)]"
         >
           <div className="flex items-start justify-between gap-3">
             <p className="text-[0.84rem] font-medium tracking-tight text-slate-700">
@@ -270,12 +271,12 @@ function MobileMatchesCards({ matches }: MobileMatchesCardsProps) {
             <span className={FORMAT_CHIP_CLASS}>{match.format}</span>
           </div>
 
-          <div className="mt-3.5 grid min-h-[5rem] grid-cols-[minmax(0,1fr)_auto_minmax(0,1fr)] items-center gap-2.5">
-            <p className="min-w-0 text-right text-[1rem] font-medium text-slate-800">
+          <div className="mt-2.5 grid min-h-[3.4rem] grid-cols-[minmax(0,1fr)_auto_minmax(0,1fr)] items-center gap-2.5">
+            <p className="min-w-0 self-center text-right text-[1rem] font-medium text-slate-800">
               <span className="block truncate">{getMobilePlayerName(getWinnerName(match))}</span>
             </p>
 
-            <div className="min-w-[4.5rem] text-center">
+            <div className="min-w-[4.5rem] self-center text-center">
               <div className="flex items-baseline justify-center gap-1 text-[1.68rem] font-semibold leading-none tracking-tight text-slate-800">
                 <span>
                   {getWinnerScore(match).winner}
@@ -287,7 +288,7 @@ function MobileMatchesCards({ matches }: MobileMatchesCardsProps) {
               </div>
             </div>
 
-            <p className="min-w-0 text-[1rem] font-medium text-slate-700">
+            <p className="min-w-0 self-center text-[1rem] font-medium text-slate-700">
               <span className="block truncate">{getMobilePlayerName(getLoserName(match))}</span>
             </p>
           </div>
@@ -320,11 +321,30 @@ function PlusIcon() {
   );
 }
 
+function useIsDesktop() {
+  const [isDesktop, setIsDesktop] = useState(false);
+
+  useEffect(() => {
+    const mediaQuery = window.matchMedia("(min-width: 768px)");
+    const updateViewport = () => setIsDesktop(mediaQuery.matches);
+
+    updateViewport();
+    mediaQuery.addEventListener("change", updateViewport);
+
+    return () => {
+      mediaQuery.removeEventListener("change", updateViewport);
+    };
+  }, []);
+
+  return isDesktop;
+}
+
 export function MatchesListView({
   initialMatches,
   opponentOptions,
   viewer,
 }: MatchesListViewProps) {
+  const isDesktop = useIsDesktop();
   const [searchValue, setSearchValue] = useState("");
   const [requestedPage, setRequestedPage] = useState(1);
   const deferredSearchValue = useDeferredValue(searchValue);
@@ -334,6 +354,7 @@ export function MatchesListView({
   const router = useRouter();
   const isCreateOpen = searchParams.get("create") === "1";
   const matches = initialMatches;
+  const pageSize = isDesktop ? MATCHES_PAGE_SIZE_DESKTOP : MATCHES_PAGE_SIZE_MOBILE;
 
   const filteredMatches = matches.filter((match) => {
     if (!normalizedSearchValue) {
@@ -344,10 +365,10 @@ export function MatchesListView({
     return playerNames.includes(normalizedSearchValue);
   });
 
-  const totalPages = Math.max(1, Math.ceil(filteredMatches.length / MATCHES_PAGE_SIZE));
+  const totalPages = Math.max(1, Math.ceil(filteredMatches.length / pageSize));
   const currentPage = Math.min(requestedPage, totalPages);
-  const pageStartIndex = (currentPage - 1) * MATCHES_PAGE_SIZE;
-  const currentMatches = filteredMatches.slice(pageStartIndex, pageStartIndex + MATCHES_PAGE_SIZE);
+  const pageStartIndex = (currentPage - 1) * pageSize;
+  const currentMatches = filteredMatches.slice(pageStartIndex, pageStartIndex + pageSize);
   const hasMatches = filteredMatches.length > 0;
 
   async function handleCreateMatch(payload: CreateMatchPayload) {
@@ -422,7 +443,7 @@ export function MatchesListView({
                 <Pagination
                   currentPage={currentPage}
                   onPageChange={setRequestedPage}
-                  pageSize={MATCHES_PAGE_SIZE}
+                  pageSize={pageSize}
                   totalItems={filteredMatches.length}
                   totalPages={totalPages}
                 />
