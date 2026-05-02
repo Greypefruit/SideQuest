@@ -29,6 +29,13 @@
       "when": 1776948123742,
       "tag": "0003_tense_the_call",
       "breakpoints": true
+    },
+    {
+      "idx": 4,
+      "version": "7",
+      "when": 1777510800000,
+      "tag": "0004_spotty_tournament_registration",
+      "breakpoints": true
     }
   ]
 }

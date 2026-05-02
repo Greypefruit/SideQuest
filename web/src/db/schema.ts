@@ -36,6 +36,8 @@ export const competitionFormatEnum = pgEnum("competition_format", [
 
 export const competitionStatusEnum = pgEnum("competition_status", [
   "draft",
+  "registration",
+  "ready",
   "in_progress",
   "completed",
   "cancelled",
@@ -251,6 +253,7 @@ export const competitions = pgTable(
       .default("single_elimination"),
     matchFormat: matchFormatEnum("match_format").notNull(),
     status: competitionStatusEnum("status").notNull().default("draft"),
+    maxParticipants: integer("max_participants").notNull().default(16),
     scheduledAt: timestamp("scheduled_at"),
     location: varchar("location", { length: locationLength }),
     createdByProfileId: uuid("created_by_profile_id")
@@ -265,6 +268,10 @@ export const competitions = pgTable(
     check(
       "competitions_title_not_empty",
       sql`char_length(trim(${table.title})) > 0`,
+    ),
+    check(
+      "competitions_max_participants_positive",
+      sql`${table.maxParticipants} >= 2`,
     ),
   ],
 );

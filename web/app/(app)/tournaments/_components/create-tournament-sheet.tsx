@@ -1,21 +1,19 @@
 "use client";
 
 import Link from "next/link";
-import { useActionState, useState } from "react";
+import { useRouter } from "next/navigation";
+import { useActionState, useEffect } from "react";
 import { useFormStatus } from "react-dom";
 import { createTournamentAction } from "../actions";
 
-type MatchFormat = "BO1" | "BO3" | "BO5";
-
-type CreateTournamentFormState = {
-  error: string | null;
+type CreateTournamentSheetProps = {
+  closeHref: string;
+  isOpen: boolean;
 };
 
-const INITIAL_FORM_STATE: CreateTournamentFormState = {
-  error: null,
+const INITIAL_FORM_STATE = {
+  error: null as string | null,
 };
-
-const MATCH_FORMAT_OPTIONS: MatchFormat[] = ["BO1", "BO3", "BO5"];
 
 function CloseIcon() {
   return (
@@ -44,193 +42,240 @@ function BackArrowIcon() {
   );
 }
 
-function SubmitButton({ disabled }: { disabled: boolean }) {
+function SubmitButton() {
   const { pending } = useFormStatus();
 
   return (
     <button
-      className="inline-flex min-h-12 w-full items-center justify-center rounded-[var(--radius-default)] bg-blue-600 px-4 text-[0.95rem] font-semibold text-white transition hover:bg-blue-700 disabled:cursor-not-allowed disabled:bg-blue-300"
-      disabled={disabled || pending}
       type="submit"
+      disabled={pending}
+      className="inline-flex min-h-11 w-full items-center justify-center rounded-[var(--radius-default)] border border-blue-500 bg-blue-500 px-4 text-[0.92rem] font-semibold text-white transition hover:bg-blue-600 disabled:cursor-not-allowed disabled:border-blue-300 disabled:bg-blue-300 md:min-h-10 md:min-w-[170px] md:w-auto md:text-[0.86rem]"
     >
-      {pending ? "Создание..." : "Создать турнир"}
+      {pending ? "Создаем турнир..." : "Создать турнир"}
     </button>
   );
 }
 
-type FieldLabelProps = {
-  children: string;
-};
-
-function FieldLabel({ children }: FieldLabelProps) {
-  return (
-    <label className="block text-[0.64rem] font-semibold uppercase tracking-[0.08em] text-slate-500">
-      {children}
-    </label>
-  );
-}
-
-type ReadOnlyFieldProps = {
-  label: string;
-  value: string;
-};
-
-function ReadOnlyField({ label, value }: ReadOnlyFieldProps) {
-  return (
-    <div className="rounded-[var(--radius-default)] border border-slate-200 bg-slate-50/60 px-3 py-3">
-      <p className="text-[0.64rem] font-semibold uppercase tracking-[0.08em] text-slate-500">
-        {label}
-      </p>
-      <p className="mt-1.5 text-[0.98rem] font-medium text-slate-800">{value}</p>
-    </div>
-  );
-}
-
-export function CreateTournamentSheet() {
-  return <CreateTournamentSheetInner closeHref="/tournaments?tab=my" />;
-}
-
-type CreateTournamentSheetProps = {
-  closeHref: string;
-};
-
-export function CreateTournamentSheetInner({ closeHref }: CreateTournamentSheetProps) {
+export function CreateTournamentSheet({
+  closeHref,
+  isOpen,
+}: CreateTournamentSheetProps) {
+  const router = useRouter();
   const [state, formAction] = useActionState(createTournamentAction, INITIAL_FORM_STATE);
-  const [title, setTitle] = useState("");
-  const [matchFormat, setMatchFormat] = useState<MatchFormat>("BO3");
 
-  const isSubmitDisabled = title.trim().length === 0 || !matchFormat;
+  useEffect(() => {
+    if (!isOpen) {
+      return;
+    }
+
+    const previousOverflow = document.body.style.overflow;
+
+    function handleKeyDown(event: KeyboardEvent) {
+      if (event.key === "Escape") {
+        router.push(closeHref);
+      }
+    }
+
+    document.body.style.overflow = "hidden";
+    window.addEventListener("keydown", handleKeyDown);
+
+    return () => {
+      document.body.style.overflow = previousOverflow;
+      window.removeEventListener("keydown", handleKeyDown);
+    };
+  }, [closeHref, isOpen, router]);
+
+  if (!isOpen) {
+    return null;
+  }
 
   return (
     <div
-      className="fixed inset-0 z-50 bg-white md:flex md:items-center md:justify-center md:bg-slate-950/38 md:p-4"
-      onClick={(event) => {
-        if (
-          event.target === event.currentTarget &&
-          window.matchMedia("(min-width: 768px)").matches
-        ) {
-          window.location.href = closeHref;
+      className="fixed inset-0 z-50 flex items-end bg-slate-950/45 backdrop-blur-[1px] md:items-center md:justify-center"
+      onMouseDown={(event) => {
+        if (event.target === event.currentTarget) {
+          router.push(closeHref);
         }
       }}
-      role="presentation"
     >
-      <section className="flex min-h-screen w-full flex-col bg-white md:min-h-0 md:max-h-[min(92vh,760px)] md:max-w-[32.5rem] md:overflow-hidden md:rounded-[var(--radius-default)] md:border md:border-slate-200/90 md:shadow-[0_20px_50px_rgba(15,23,42,0.16)]">
-        <header className="sticky top-0 z-10 flex items-center justify-between border-b border-slate-200/80 bg-white px-4 py-4 md:px-5 md:py-4">
-          <div className="flex min-w-0 items-center gap-3">
-            <Link
-              href={closeHref}
-              className="inline-flex h-9 w-9 items-center justify-center rounded-[var(--radius-default)] text-blue-600 transition hover:bg-blue-50 md:hidden"
+      <div className="flex max-h-[100dvh] w-full flex-col overflow-hidden rounded-t-[20px] bg-white shadow-[0_-12px_48px_rgba(15,23,42,0.18)] md:max-h-[calc(100dvh-4rem)] md:max-w-[560px] md:rounded-[18px] md:shadow-[0_28px_80px_rgba(15,23,42,0.18)]">
+        <div className="flex items-center justify-between border-b border-slate-200 px-4 py-3.5 md:px-5 md:py-4">
+          <div className="flex items-center gap-2.5">
+            <button
+              type="button"
+              aria-label="Закрыть создание турнира"
+              className="inline-flex size-9 items-center justify-center rounded-full text-blue-600 transition hover:bg-blue-50 md:hidden"
+              onClick={() => router.push(closeHref)}
             >
               <BackArrowIcon />
-            </Link>
-
-            <h1 className="text-[1.95rem] font-semibold tracking-tight text-slate-950 md:text-[1.55rem]">
-              Создание турнира
-            </h1>
+            </button>
+            <div>
+              <p className="text-[1.22rem] font-semibold tracking-tight text-slate-950 md:text-[1.28rem]">
+                Создание турнира
+              </p>
+              <p className="hidden text-[0.82rem] text-slate-500 md:block">
+                Быстро создайте черновик и продолжите настройку на странице турнира.
+              </p>
+            </div>
           </div>
 
-          <Link
-            href={closeHref}
-            className="hidden h-9 w-9 items-center justify-center rounded-[var(--radius-default)] text-slate-500 transition hover:bg-slate-100 hover:text-slate-700 md:inline-flex"
+          <button
+            type="button"
+            aria-label="Закрыть создание турнира"
+            className="hidden items-center justify-center rounded-full p-2 text-slate-500 transition hover:bg-slate-100 hover:text-slate-700 md:inline-flex"
+            onClick={() => router.push(closeHref)}
           >
             <CloseIcon />
-          </Link>
-        </header>
+          </button>
+        </div>
 
-        <div className="flex-1 overflow-y-auto px-4 py-4 md:px-5 md:py-5">
-          <form action={formAction} className="space-y-5 md:space-y-4.5">
-            <div className="space-y-2.5">
-              <FieldLabel>Название турнира *</FieldLabel>
+        <form action={formAction} className="flex min-h-0 flex-1 flex-col">
+          <div className="flex-1 space-y-5 overflow-y-auto px-4 py-4 md:px-5 md:py-5">
+            <div className="space-y-2">
+              <label
+                htmlFor="title"
+                className="block text-[0.68rem] font-semibold uppercase tracking-[0.08em] text-slate-500"
+              >
+                Название турнира
+              </label>
               <input
-                className="min-h-12 w-full rounded-[var(--radius-default)] border border-slate-200 bg-white px-3 text-[1rem] font-medium text-slate-900 outline-none transition placeholder:text-slate-300 focus:border-blue-500 focus:ring-4 focus:ring-blue-100"
                 id="title"
                 name="title"
-                onChange={(event) => setTitle(event.target.value)}
+                required
+                maxLength={255}
                 placeholder="Например, Весенний кубок"
-                type="text"
-                value={title}
+                className="min-h-11 w-full rounded-[var(--radius-default)] border border-slate-200 px-3.5 text-[0.95rem] text-slate-900 outline-none transition placeholder:text-slate-400 focus:border-blue-400 focus:ring-2 focus:ring-blue-100 md:min-h-10 md:text-[0.92rem]"
               />
             </div>
 
-            <div className="grid gap-3">
-              <ReadOnlyField label="Активность" value="Настольный теннис" />
-              <ReadOnlyField label="Формат турнира" value="На выбывание" />
-            </div>
+            <div className="grid gap-3 md:grid-cols-2">
+              <div className="rounded-[var(--radius-default)] border border-slate-200 bg-slate-50 px-3.5 py-3">
+                <p className="text-[0.68rem] font-semibold uppercase tracking-[0.08em] text-slate-500">
+                  Активность
+                </p>
+                <p className="mt-1 text-[0.95rem] font-medium text-slate-900 md:text-[0.92rem]">
+                  Настольный теннис
+                </p>
+              </div>
 
-            <div className="space-y-2.5">
-              <FieldLabel>Формат матчей *</FieldLabel>
-              <input name="matchFormat" type="hidden" value={matchFormat} />
-
-              <div className="grid grid-cols-3 gap-2">
-                {MATCH_FORMAT_OPTIONS.map((option) => {
-                  const isActive = option === matchFormat;
-
-                  return (
-                    <button
-                      key={option}
-                      className={`inline-flex min-h-12 items-center justify-center rounded-[var(--radius-default)] border text-[0.95rem] font-semibold transition ${
-                        isActive
-                          ? "border-blue-600 bg-blue-50 text-blue-700"
-                          : "border-slate-200 bg-white text-slate-600 hover:border-slate-300 hover:bg-slate-50"
-                      }`}
-                      onClick={() => setMatchFormat(option)}
-                      type="button"
-                    >
-                      {option}
-                    </button>
-                  );
-                })}
+              <div className="rounded-[var(--radius-default)] border border-slate-200 bg-slate-50 px-3.5 py-3">
+                <p className="text-[0.68rem] font-semibold uppercase tracking-[0.08em] text-slate-500">
+                  Формат турнира
+                </p>
+                <p className="mt-1 text-[0.95rem] font-medium text-slate-900 md:text-[0.92rem]">
+                  На выбывание
+                </p>
               </div>
             </div>
 
-            <div className="grid gap-3 sm:grid-cols-2">
-              <div className="space-y-2.5">
-                <FieldLabel>Дата (опционально)</FieldLabel>
+            <fieldset className="space-y-2">
+              <legend className="block text-[0.68rem] font-semibold uppercase tracking-[0.08em] text-slate-500">
+                Формат матчей
+              </legend>
+              <div className="grid grid-cols-3 gap-2">
+                {(["BO1", "BO3", "BO5"] as const).map((format, index) => (
+                  <label key={format} className="block">
+                    <input
+                      defaultChecked={index === 1}
+                      className="peer sr-only"
+                      name="matchFormat"
+                      type="radio"
+                      value={format}
+                    />
+                    <span className="inline-flex min-h-11 w-full items-center justify-center rounded-[var(--radius-default)] border border-slate-300 bg-white text-[0.92rem] font-semibold text-slate-600 transition peer-checked:border-blue-600 peer-checked:bg-blue-50 peer-checked:text-blue-700 md:min-h-10 md:text-[0.88rem]">
+                      {format}
+                    </span>
+                  </label>
+                ))}
+              </div>
+            </fieldset>
+
+            <div className="grid gap-3 md:grid-cols-2">
+              <div className="space-y-2">
+                <label
+                  htmlFor="scheduledDate"
+                  className="block text-[0.68rem] font-semibold uppercase tracking-[0.08em] text-slate-500"
+                >
+                  Дата
+                </label>
                 <input
-                  className="min-h-12 w-full rounded-[var(--radius-default)] border border-slate-200 bg-white px-3 text-[0.96rem] font-medium text-slate-900 outline-none transition focus:border-blue-500 focus:ring-4 focus:ring-blue-100"
                   id="scheduledDate"
-                  lang="ru-RU"
                   name="scheduledDate"
                   type="date"
+                  className="min-h-11 w-full rounded-[var(--radius-default)] border border-slate-200 px-3.5 text-[0.95rem] text-slate-900 outline-none transition focus:border-blue-400 focus:ring-2 focus:ring-blue-100 md:min-h-10 md:text-[0.92rem]"
                 />
               </div>
 
-              <div className="space-y-2.5">
-                <FieldLabel>Время (опционально)</FieldLabel>
+              <div className="space-y-2">
+                <label
+                  htmlFor="scheduledTime"
+                  className="block text-[0.68rem] font-semibold uppercase tracking-[0.08em] text-slate-500"
+                >
+                  Время
+                </label>
                 <input
-                  className="min-h-12 w-full rounded-[var(--radius-default)] border border-slate-200 bg-white px-3 text-[0.96rem] font-medium text-slate-900 outline-none transition focus:border-blue-500 focus:ring-4 focus:ring-blue-100"
                   id="scheduledTime"
-                  lang="ru-RU"
                   name="scheduledTime"
                   step={60}
                   type="time"
+                  className="min-h-11 w-full rounded-[var(--radius-default)] border border-slate-200 px-3.5 text-[0.95rem] text-slate-900 outline-none transition focus:border-blue-400 focus:ring-2 focus:ring-blue-100 md:min-h-10 md:text-[0.92rem]"
                 />
               </div>
             </div>
 
-            <div className="space-y-2.5">
-              <FieldLabel>Локация (опционально)</FieldLabel>
+            <div className="space-y-2">
+              <label
+                htmlFor="maxParticipants"
+                className="block text-[0.68rem] font-semibold uppercase tracking-[0.08em] text-slate-500"
+              >
+                Лимит участников
+              </label>
               <input
-                className="min-h-12 w-full rounded-[var(--radius-default)] border border-slate-200 bg-white px-3 text-[0.96rem] font-medium text-slate-900 outline-none transition placeholder:text-slate-300 focus:border-blue-500 focus:ring-4 focus:ring-blue-100"
+                id="maxParticipants"
+                name="maxParticipants"
+                type="number"
+                min={2}
+                defaultValue={16}
+                className="min-h-11 w-full rounded-[var(--radius-default)] border border-slate-200 px-3.5 text-[0.95rem] text-slate-900 outline-none transition focus:border-blue-400 focus:ring-2 focus:ring-blue-100 md:min-h-10 md:text-[0.92rem]"
+              />
+            </div>
+
+            <div className="space-y-2">
+              <label
+                htmlFor="location"
+                className="block text-[0.68rem] font-semibold uppercase tracking-[0.08em] text-slate-500"
+              >
+                Локация
+              </label>
+              <input
                 id="location"
                 name="location"
+                maxLength={255}
                 placeholder="Укажите место проведения"
-                type="text"
+                className="min-h-11 w-full rounded-[var(--radius-default)] border border-slate-200 px-3.5 text-[0.95rem] text-slate-900 outline-none transition placeholder:text-slate-400 focus:border-blue-400 focus:ring-2 focus:ring-blue-100 md:min-h-10 md:text-[0.92rem]"
               />
             </div>
 
             {state.error ? (
-              <p className="rounded-[var(--radius-default)] border border-red-200 bg-red-50 px-3 py-2 text-[0.88rem] text-red-700">
+              <div className="rounded-[var(--radius-default)] border border-red-200 bg-red-50 px-3.5 py-3 text-[0.88rem] text-red-700">
                 {state.error}
-              </p>
+              </div>
             ) : null}
+          </div>
 
-            <div className="pt-1 md:pt-2">
-              <SubmitButton disabled={isSubmitDisabled} />
+          <div className="border-t border-slate-200 px-4 py-4 md:px-5">
+            <div className="flex flex-col gap-2 sm:flex-row sm:justify-end">
+              <Link
+                href={closeHref}
+                className="inline-flex min-h-11 items-center justify-center rounded-[var(--radius-default)] border border-slate-200 px-4 text-[0.92rem] font-medium text-slate-600 transition hover:bg-slate-50 md:min-h-10 md:w-auto md:text-[0.86rem]"
+              >
+                Отмена
+              </Link>
+              <SubmitButton />
             </div>
-          </form>
-        </div>
-      </section>
+          </div>
+        </form>
+      </div>
     </div>
   );
 }

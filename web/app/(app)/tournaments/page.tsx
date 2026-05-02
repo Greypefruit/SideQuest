@@ -4,15 +4,31 @@ import {
   getDefaultActivityType,
   listCompetitionsByActivity,
   listCompetitionsByOwner,
+  listProfileCompetitions,
   listCompetitionsVisibleToOrganizerAll,
 } from "@/src/db/queries";
-import { CreateTournamentSheetInner } from "./_components/create-tournament-sheet";
-import { TournamentDetailSheet } from "./_components/tournament-detail-sheet";
+import {
+  resolveTournamentRuntimeState,
+  type TournamentStatus,
+} from "@/src/tournaments/runtime-state";
+import { CreateTournamentSheet } from "./_components/create-tournament-sheet";
 import { TournamentsListSection } from "./_components/tournaments-list-section";
-import { getTournamentDetailData } from "./detail-data";
 
-const ADMIN_VISIBLE_STATUSES = ["draft", "in_progress", "completed", "cancelled"] as const;
-const PLAYER_VISIBLE_STATUSES = ["in_progress", "completed"] as const;
+const ADMIN_VISIBLE_STATUSES = [
+  "draft",
+  "registration",
+  "ready",
+  "in_progress",
+  "completed",
+  "cancelled",
+] as const;
+const PLAYER_VISIBLE_STATUSES = [
+  "registration",
+  "ready",
+  "in_progress",
+  "completed",
+  "cancelled",
+] as const;
 
 type CompetitionListEntry = Awaited<ReturnType<typeof listCompetitionsByActivity>>[number];
 
@@ -20,7 +36,6 @@ type TournamentTab = "my" | "all";
 
 type TournamentsPageProps = {
   searchParams?: Promise<{
-    competition?: string | string[] | undefined;
     create?: string | string[] | undefined;
     page?: string | string[] | undefined;
     tab?: string | string[] | undefined;
@@ -28,7 +43,6 @@ type TournamentsPageProps = {
 };
 
 type TournamentsSearchParams = {
-  competition?: string | string[] | undefined;
   create?: string | string[] | undefined;
   page?: string | string[] | undefined;
   tab?: string | string[] | undefined;
@@ -64,10 +78,6 @@ function parsePositivePage(value: string | undefined) {
   return parsedValue;
 }
 
-function isCreateSheetOpen(value: string | undefined) {
-  return value === "1";
-}
-
 function buildListHref(activeTab: TournamentTab, page: number) {
   return buildTournamentsHref(activeTab, page);
 }
@@ -76,7 +86,6 @@ function buildTournamentsHref(
   activeTab: TournamentTab,
   page: number,
   options?: {
-    competitionId?: string;
     create?: boolean;
   },
 ) {
@@ -92,25 +101,25 @@ function buildTournamentsHref(
     params.set("create", "1");
   }
 
-  if (options?.competitionId) {
-    params.set("competition", options.competitionId);
-  }
-
   const query = params.toString();
 
   return query ? `/tournaments?${query}` : "/tournaments";
 }
 
-function getCompetitionStatusOrder(status: CompetitionListEntry["competition"]["status"]) {
+function getCompetitionStatusOrder(status: TournamentStatus) {
   switch (status) {
-    case "in_progress":
-      return 0;
     case "draft":
+      return 0;
+    case "in_progress":
       return 1;
-    case "completed":
+    case "ready":
       return 2;
-    case "cancelled":
+    case "registration":
       return 3;
+    case "completed":
+      return 4;
+    case "cancelled":
+      return 5;
   }
 }
 
@@ -186,17 +195,29 @@ function compareScheduledCompetitions(left: CompetitionListEntry, right: Competi
 
 function sortCompetitions(entries: CompetitionListEntry[]) {
   return [...entries].sort((left, right) => {
+    const leftRuntimeState = resolveTournamentRuntimeState({
+      hasBracket: left.matchesCount > 0,
+      scheduledAt: left.competition.scheduledAt,
+      status: left.competition.status as TournamentStatus,
+    });
+    const rightRuntimeState = resolveTournamentRuntimeState({
+      hasBracket: right.matchesCount > 0,
+      scheduledAt: right.competition.scheduledAt,
+      status: right.competition.status as TournamentStatus,
+    });
     const statusOrderDifference =
-      getCompetitionStatusOrder(left.competition.status) -
-      getCompetitionStatusOrder(right.competition.status);
+      getCompetitionStatusOrder(leftRuntimeState.effectiveStatus) -
+      getCompetitionStatusOrder(rightRuntimeState.effectiveStatus);
 
     if (statusOrderDifference !== 0) {
       return statusOrderDifference;
     }
 
-    switch (left.competition.status) {
-      case "in_progress":
+    switch (leftRuntimeState.effectiveStatus) {
       case "draft":
+      case "registration":
+      case "ready":
+      case "in_progress":
         return compareScheduledCompetitions(left, right);
       case "completed": {
         const completionComparison = compareDescDates(
@@ -240,25 +261,13 @@ export default async function TournamentsPage({ searchParams }: TournamentsPageP
   const isOrganizer = viewer.role === "organizer";
   const activeTab = isManager ? parseTournamentTab(getSingleSearchParam(params.tab)) : "all";
   const requestedPage = parsePositivePage(getSingleSearchParam(params.page));
-  const selectedCompetitionId = getSingleSearchParam(params.competition);
-  const closeDetailHref = buildListHref(activeTab, requestedPage ?? 1);
-  const detailData = selectedCompetitionId
-    ? await getTournamentDetailData(viewer, selectedCompetitionId)
-    : null;
-  const createSheetOpen =
-    isManager &&
-    !selectedCompetitionId &&
-    isCreateSheetOpen(getSingleSearchParam(params.create));
+  const createSheetOpen = getSingleSearchParam(params.create) === "1";
 
   if (getSingleSearchParam(params.page) !== undefined && requestedPage === null) {
     redirect(buildListHref(activeTab, 1));
   }
 
-  if (selectedCompetitionId && !detailData) {
-    redirect(closeDetailHref);
-  }
-
-  const [allCompetitions, myCompetitions] = await Promise.all([
+  const [allCompetitions, myCompetitions, viewerCompetitions] = await Promise.all([
     isAdmin
       ? listCompetitionsByActivity(
           activityType.id,
@@ -281,15 +290,17 @@ export default async function TournamentsPage({ searchParams }: TournamentsPageP
           { statuses: [...ADMIN_VISIBLE_STATUSES] },
         )
       : Promise.resolve([]),
+    listProfileCompetitions(viewer.profileId, activityType.id),
   ]);
   const sortedAllCompetitions = sortCompetitions(allCompetitions);
   const sortedMyCompetitions = sortCompetitions(myCompetitions);
+  const viewerCompetitionIds = new Set(
+    viewerCompetitions.map((entry) => entry.competition.id),
+  );
 
   const selectedCompetitions =
     isManager && activeTab === "my" ? sortedMyCompetitions : sortedAllCompetitions;
   const hasAnyVisibleCompetitions = sortedAllCompetitions.length > 0;
-  const currentPage = requestedPage ?? 1;
-  const closeCreateHref = buildListHref(activeTab, currentPage);
 
   return (
     <div className="mx-auto w-full max-w-[1040px] min-w-0 overflow-x-hidden">
@@ -302,54 +313,37 @@ export default async function TournamentsPage({ searchParams }: TournamentsPageP
 
         <TournamentsListSection
           activeTab={activeTab}
-          entries={selectedCompetitions.map((entry) => ({
-            id: entry.competition.id,
-            matchFormat: entry.competition.matchFormat,
-            participantsCount: entry.participantsCount,
-            scheduledAt: entry.competition.scheduledAt
-              ? entry.competition.scheduledAt.toISOString()
-              : null,
-            status: entry.competition.status as
-              | "draft"
-              | "in_progress"
-              | "completed"
-              | "cancelled",
-            title: entry.competition.title,
-          }))}
+          entries={selectedCompetitions.map((entry) => {
+            const runtimeState = resolveTournamentRuntimeState({
+              hasBracket: entry.matchesCount > 0,
+              scheduledAt: entry.competition.scheduledAt,
+              status: entry.competition.status as TournamentStatus,
+            });
+
+            return {
+              hasBracket: entry.matchesCount > 0,
+              id: entry.competition.id,
+              isViewerParticipant: viewerCompetitionIds.has(entry.competition.id),
+              matchFormat: entry.competition.matchFormat,
+              participantsCount: entry.participantsCount,
+              runtimeState,
+              scheduledAt: entry.competition.scheduledAt
+                ? entry.competition.scheduledAt.toISOString()
+                : null,
+              title: entry.competition.title,
+            };
+          })}
           hasAnyVisibleCompetitions={hasAnyVisibleCompetitions}
           isManager={isManager}
         />
-      </div>
 
-      {createSheetOpen ? <CreateTournamentSheetInner closeHref={closeCreateHref} /> : null}
-      {detailData ? (
-        <TournamentDetailSheet
-          bracket={detailData.bracket}
-          canManageDraft={detailData.canManageDraft}
-          closeHref={buildListHref(activeTab, currentPage)}
-          competition={{
-            activityName: detailData.competitionData.activityType.nameRu,
-            createdByProfileId: detailData.competitionData.competition.createdByProfileId,
-            id: detailData.competitionData.competition.id,
-            location: detailData.competitionData.competition.location,
-            matchFormat: detailData.competitionData.competition.matchFormat,
-            organizerName: detailData.competitionData.owner.displayName,
-            scheduledAt: detailData.competitionData.competition.scheduledAt
-              ? detailData.competitionData.competition.scheduledAt.toISOString()
-              : null,
-            status: detailData.competitionData.competition.status as
-              | "draft"
-              | "in_progress"
-              | "completed"
-              | "cancelled",
-            title: detailData.competitionData.competition.title,
-          }}
-          participantOptions={detailData.participantOptions}
-          participants={detailData.participants}
-          presentation="modal"
-          viewer={viewer}
-        />
-      ) : null}
+        {isManager ? (
+          <CreateTournamentSheet
+            closeHref={buildListHref(activeTab, requestedPage ?? 1)}
+            isOpen={createSheetOpen}
+          />
+        ) : null}
+      </div>
     </div>
   );
 }

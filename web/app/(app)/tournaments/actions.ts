@@ -13,10 +13,16 @@ import {
   getCompetitionParticipants,
   getDefaultActivityType,
   getParticipantById,
+  getParticipantByProfileAndActivity,
   isParticipantInCompetition,
   listCompetitionMatches,
   updateRankingByParticipantId,
 } from "@/src/db/queries";
+import {
+  resolveTournamentRuntimeState,
+  type TournamentRuntimeState,
+  type TournamentStatus,
+} from "@/src/tournaments/runtime-state";
 
 const ALLOWED_MATCH_FORMATS = ["BO1", "BO3", "BO5"] as const;
 const MAX_TITLE_LENGTH = 255;
@@ -28,6 +34,23 @@ type WinnerKey = "player1" | "player2";
 
 function isAllowedMatchFormat(value: string): value is MatchFormat {
   return ALLOWED_MATCH_FORMATS.includes(value as MatchFormat);
+}
+
+function parseMaxParticipants(value: number | string) {
+  const normalized =
+    typeof value === "number" ? value : Number.parseInt(String(value).trim(), 10);
+
+  if (!Number.isSafeInteger(normalized) || normalized < 2) {
+    return {
+      ok: false as const,
+      message: "Лимит участников должен быть целым числом не меньше 2.",
+    };
+  }
+
+  return {
+    ok: true as const,
+    value: normalized,
+  };
 }
 
 function parseOptionalScheduledAt(rawDate: string, rawTime: string) {
@@ -187,30 +210,19 @@ async function getManageableDraftCompetition(
   competitionId: string,
   database: typeof db | Parameters<Parameters<typeof db.transaction>[0]>[0],
 ) {
-  const competitionData = await getCompetitionForManagement(competitionId, database);
+  const competitionResult = await getManageableCompetition(viewer, competitionId, database);
 
-  if (!competitionData) {
-    return buildTournamentActionError("Турнир не найден.");
+  if (!competitionResult.ok) {
+    return competitionResult;
   }
 
-  if (viewer.role !== "organizer" && viewer.role !== "admin") {
-    return buildTournamentActionError("У вас нет прав для управления турниром.");
-  }
-
-  if (
-    viewer.role === "organizer" &&
-    competitionData.competition.createdByProfileId !== viewer.profileId
-  ) {
-    return buildTournamentActionError("Организатор может управлять только своим турниром.");
-  }
-
-  if (competitionData.competition.status !== "draft") {
+  if (competitionResult.runtimeState.status !== "draft") {
     return buildTournamentActionError(
       "Редактирование доступно только для турнира в статусе «черновик».",
     );
   }
 
-  return { competitionData, ok: true as const, viewer };
+  return competitionResult;
 }
 
 async function getManageableCompetition(
@@ -235,7 +247,14 @@ async function getManageableCompetition(
     return buildTournamentActionError("Организатор может управлять только своим турниром.");
   }
 
-  return { competitionData, ok: true as const, viewer };
+  const bracket = await listCompetitionMatches(competitionId, database);
+  const runtimeState = resolveTournamentRuntimeState({
+    hasBracket: bracket.length > 0,
+    scheduledAt: competitionData.competition.scheduledAt,
+    status: competitionData.competition.status as TournamentStatus,
+  });
+
+  return { bracket, competitionData, ok: true as const, runtimeState, viewer };
 }
 
 async function getManageableInProgressCompetition(
@@ -249,13 +268,28 @@ async function getManageableInProgressCompetition(
     return competitionResult;
   }
 
-  if (competitionResult.competitionData.competition.status !== "in_progress") {
+  if (competitionResult.runtimeState.effectiveStatus !== "in_progress") {
     return buildTournamentActionError(
       "Ввод результата доступен только для турнира в статусе «идет».",
     );
   }
 
   return competitionResult;
+}
+
+function buildTournamentStateMessage(
+  runtimeState: TournamentRuntimeState,
+  allowedStatuses: TournamentStatus[],
+) {
+  if (runtimeState.isTerminal) {
+    return "Для завершенного или отмененного турнира это действие недоступно.";
+  }
+
+  if (!allowedStatuses.includes(runtimeState.status)) {
+    return "Текущее состояние турнира не позволяет выполнить это действие.";
+  }
+
+  return null;
 }
 
 type GeneratedBracketMatch = {
@@ -447,6 +481,7 @@ export async function createTournamentAction(
   const title = String(formData.get("title") ?? "").trim();
   const matchFormatValue = String(formData.get("matchFormat") ?? "").trim();
   const location = String(formData.get("location") ?? "").trim();
+  const maxParticipantsValue = String(formData.get("maxParticipants") ?? "").trim();
   const rawDate = String(formData.get("scheduledDate") ?? "");
   const rawTime = String(formData.get("scheduledTime") ?? "");
 
@@ -466,6 +501,12 @@ export async function createTournamentAction(
     return { error: "Локация указана слишком длинно." };
   }
 
+  const parsedMaxParticipants = parseMaxParticipants(maxParticipantsValue);
+
+  if (!parsedMaxParticipants.ok) {
+    return { error: parsedMaxParticipants.message };
+  }
+
   const parsedScheduledAt = parseOptionalScheduledAt(rawDate, rawTime);
 
   if (!parsedScheduledAt.ok) {
@@ -478,12 +519,13 @@ export async function createTournamentAction(
     throw new Error("Default activity type is missing");
   }
 
-  await createCompetition({
+  const competition = await createCompetition({
     activityTypeId: activityType.id,
     title,
     format: "single_elimination",
     matchFormat: matchFormatValue,
     status: "draft",
+    maxParticipants: parsedMaxParticipants.value,
     scheduledAt: parsedScheduledAt.value,
     location: location || null,
     createdByProfileId: viewer.profileId,
@@ -492,12 +534,13 @@ export async function createTournamentAction(
   });
 
   revalidatePath("/tournaments");
-  redirect("/tournaments?tab=my");
+  redirect(`/tournaments/${competition.id}`);
 }
 
 export async function updateTournamentDraftAction(input: {
   competitionId: string;
   location: string;
+  maxParticipants: number;
   matchFormat: string;
   scheduledDate: string;
   scheduledTime: string;
@@ -533,6 +576,12 @@ export async function updateTournamentDraftAction(input: {
       return buildTournamentActionError("Локация указана слишком длинно.");
     }
 
+    const parsedMaxParticipants = parseMaxParticipants(input.maxParticipants);
+
+    if (!parsedMaxParticipants.ok) {
+      return buildTournamentActionError(parsedMaxParticipants.message);
+    }
+
     const parsedScheduledAt = parseOptionalScheduledAt(
       input.scheduledDate,
       input.scheduledTime,
@@ -547,6 +596,7 @@ export async function updateTournamentDraftAction(input: {
       .set({
         title,
         location: input.location.trim() || null,
+        maxParticipants: parsedMaxParticipants.value,
         matchFormat: input.matchFormat,
         scheduledAt: parsedScheduledAt.value,
         updatedAt: new Date(),
@@ -569,7 +619,7 @@ export async function addTournamentParticipantAction(input: {
   const viewer = await requireCurrentViewer();
 
   return db.transaction(async (tx) => {
-    const competitionResult = await getManageableDraftCompetition(
+    const competitionResult = await getManageableCompetition(
       viewer,
       input.competitionId,
       tx,
@@ -577,6 +627,23 @@ export async function addTournamentParticipantAction(input: {
 
     if (!competitionResult.ok) {
       return competitionResult;
+    }
+
+    const invalidStateMessage = buildTournamentStateMessage(competitionResult.runtimeState, [
+      "draft",
+      "registration",
+    ]);
+
+    if (invalidStateMessage) {
+      return buildTournamentActionError(invalidStateMessage);
+    }
+
+    const participants = await getCompetitionParticipants(input.competitionId, tx);
+
+    if (
+      participants.length >= competitionResult.competitionData.competition.maxParticipants
+    ) {
+      return buildTournamentActionError("Достигнут лимит участников турнира.");
     }
 
     const participant = await getParticipantById(input.participantId, tx);
@@ -617,14 +684,19 @@ export async function removeTournamentParticipantAction(input: {
 }) {
   const viewer = await requireCurrentViewer();
   const result = await db.transaction(async (tx) => {
-    const competitionResult = await getManageableDraftCompetition(
-      viewer,
-      input.competitionId,
-      tx,
-    );
+    const competitionResult = await getManageableCompetition(viewer, input.competitionId, tx);
 
     if (!competitionResult.ok) {
       return competitionResult;
+    }
+
+    const invalidStateMessage = buildTournamentStateMessage(competitionResult.runtimeState, [
+      "draft",
+      "registration",
+    ]);
+
+    if (invalidStateMessage) {
+      return buildTournamentActionError(invalidStateMessage);
     }
 
     const [removedParticipant] = await tx
@@ -653,14 +725,18 @@ export async function removeTournamentParticipantAction(input: {
 export async function generateTournamentBracketAction(input: { competitionId: string }) {
   const viewer = await requireCurrentViewer();
   const result = await db.transaction(async (tx) => {
-    const competitionResult = await getManageableDraftCompetition(
-      viewer,
-      input.competitionId,
-      tx,
-    );
+    const competitionResult = await getManageableCompetition(viewer, input.competitionId, tx);
 
     if (!competitionResult.ok) {
       return competitionResult;
+    }
+
+    const invalidStateMessage = buildTournamentStateMessage(competitionResult.runtimeState, [
+      "ready",
+    ]);
+
+    if (invalidStateMessage) {
+      return buildTournamentActionError(invalidStateMessage);
     }
 
     const participants = await getCompetitionParticipants(input.competitionId, tx);
@@ -671,7 +747,7 @@ export async function generateTournamentBracketAction(input: { competitionId: st
       );
     }
 
-    const existingMatches = await listCompetitionMatches(input.competitionId, tx);
+    const existingMatches = competitionResult.bracket;
 
     if (existingMatches.length > 0) {
       return buildTournamentActionError("Сетка для этого турнира уже сформирована.");
@@ -685,16 +761,280 @@ export async function generateTournamentBracketAction(input: { competitionId: st
 
     await tx.insert(schema.competitionMatches).values(bracketMatches);
 
+    return buildTournamentActionSuccess("Сетка сформирована.");
+  });
+
+  revalidatePath("/tournaments");
+  revalidatePath(`/tournaments/${input.competitionId}`);
+
+  return result;
+}
+
+export async function openTournamentRegistrationAction(input: {
+  competitionId: string;
+}) {
+  const viewer = await requireCurrentViewer();
+  const result = await db.transaction(async (tx) => {
+    const competitionResult = await getManageableCompetition(viewer, input.competitionId, tx);
+
+    if (!competitionResult.ok) {
+      return competitionResult;
+    }
+
+    const invalidStateMessage = buildTournamentStateMessage(competitionResult.runtimeState, [
+      "draft",
+      "ready",
+    ]);
+
+    if (invalidStateMessage) {
+      return buildTournamentActionError(invalidStateMessage);
+    }
+
+    if (
+      competitionResult.runtimeState.status === "ready" &&
+      competitionResult.runtimeState.hasBracket
+    ) {
+      return buildTournamentActionError(
+        "Нельзя возобновить регистрацию после генерации сетки.",
+      );
+    }
+
     await tx
       .update(schema.competitions)
       .set({
-        startedAt: new Date(),
-        status: "in_progress",
+        status: "registration",
         updatedAt: new Date(),
       })
       .where(eq(schema.competitions.id, input.competitionId));
 
-    return buildTournamentActionSuccess("Сетка сформирована.");
+    return buildTournamentActionSuccess("Регистрация открыта.");
+  });
+
+  revalidatePath("/tournaments");
+  revalidatePath(`/tournaments/${input.competitionId}`);
+
+  return result;
+}
+
+export async function closeTournamentRegistrationAction(input: {
+  competitionId: string;
+}) {
+  const viewer = await requireCurrentViewer();
+  const result = await db.transaction(async (tx) => {
+    const competitionResult = await getManageableCompetition(viewer, input.competitionId, tx);
+
+    if (!competitionResult.ok) {
+      return competitionResult;
+    }
+
+    const invalidStateMessage = buildTournamentStateMessage(competitionResult.runtimeState, [
+      "registration",
+    ]);
+
+    if (invalidStateMessage) {
+      return buildTournamentActionError(invalidStateMessage);
+    }
+
+    const participants = await getCompetitionParticipants(input.competitionId, tx);
+
+    if (participants.length < 2) {
+      return buildTournamentActionError(
+        "Чтобы закрыть регистрацию и перевести турнир в готовность, нужно минимум два участника.",
+      );
+    }
+
+    await tx
+      .update(schema.competitions)
+      .set({
+        status: "ready",
+        updatedAt: new Date(),
+      })
+      .where(eq(schema.competitions.id, input.competitionId));
+
+    return buildTournamentActionSuccess("Регистрация закрыта. Турнир готов к генерации сетки.");
+  });
+
+  revalidatePath("/tournaments");
+  revalidatePath(`/tournaments/${input.competitionId}`);
+
+  return result;
+}
+
+export async function moveTournamentToReadyAction(input: { competitionId: string }) {
+  const viewer = await requireCurrentViewer();
+  const result = await db.transaction(async (tx) => {
+    const competitionResult = await getManageableCompetition(viewer, input.competitionId, tx);
+
+    if (!competitionResult.ok) {
+      return competitionResult;
+    }
+
+    const invalidStateMessage = buildTournamentStateMessage(competitionResult.runtimeState, [
+      "draft",
+    ]);
+
+    if (invalidStateMessage) {
+      return buildTournamentActionError(invalidStateMessage);
+    }
+
+    const participants = await getCompetitionParticipants(input.competitionId, tx);
+
+    if (participants.length < 2) {
+      return buildTournamentActionError(
+        "Чтобы перевести турнир в готовность, нужно минимум два участника.",
+      );
+    }
+
+    await tx
+      .update(schema.competitions)
+      .set({
+        status: "ready",
+        updatedAt: new Date(),
+      })
+      .where(eq(schema.competitions.id, input.competitionId));
+
+    return buildTournamentActionSuccess("Турнир переведен в статус «готов».");
+  });
+
+  revalidatePath("/tournaments");
+  revalidatePath(`/tournaments/${input.competitionId}`);
+
+  return result;
+}
+
+export async function registerToTournamentAction(input: { competitionId: string }) {
+  const viewer = await requireCurrentViewer();
+  const result = await db.transaction(async (tx) => {
+    const competitionData = await getCompetitionForManagement(input.competitionId, tx);
+
+    if (!competitionData) {
+      return buildTournamentActionError("Турнир не найден.");
+    }
+
+    const bracket = await listCompetitionMatches(input.competitionId, tx);
+    const runtimeState = resolveTournamentRuntimeState({
+      hasBracket: bracket.length > 0,
+      scheduledAt: competitionData.competition.scheduledAt,
+      status: competitionData.competition.status as TournamentStatus,
+    });
+
+    const invalidStateMessage = buildTournamentStateMessage(runtimeState, ["registration"]);
+
+    if (invalidStateMessage) {
+      return buildTournamentActionError(invalidStateMessage);
+    }
+
+    if (viewer.role === "admin") {
+      return buildTournamentActionError(
+        "Администратор управляет турнирами без самостоятельной регистрации.",
+      );
+    }
+
+    if (
+      viewer.role === "organizer" &&
+      competitionData.competition.createdByProfileId === viewer.profileId
+    ) {
+      return buildTournamentActionError(
+        "Организатор собственного турнира добавляет участников вручную.",
+      );
+    }
+
+    if (runtimeState.hasBracket) {
+      return buildTournamentActionError("Регистрация недоступна после генерации сетки.");
+    }
+
+    const participant = await getParticipantByProfileAndActivity(
+      viewer.profileId,
+      competitionData.competition.activityTypeId,
+      tx,
+    );
+
+    if (!participant || !participant.isActive) {
+      return buildTournamentActionError("Не удалось найти активного участника для регистрации.");
+    }
+
+    const alreadyRegistered = await isParticipantInCompetition(
+      input.competitionId,
+      participant.id,
+      tx,
+    );
+
+    if (alreadyRegistered) {
+      return buildTournamentActionError("Вы уже зарегистрированы в этом турнире.");
+    }
+
+    const participants = await getCompetitionParticipants(input.competitionId, tx);
+
+    if (participants.length >= competitionData.competition.maxParticipants) {
+      return buildTournamentActionError("Достигнут лимит участников турнира.");
+    }
+
+    await tx.insert(schema.competitionParticipants).values({
+      addedByProfileId: viewer.profileId,
+      competitionId: input.competitionId,
+      participantId: participant.id,
+    });
+
+    return buildTournamentActionSuccess("Вы зарегистрированы.");
+  });
+
+  revalidatePath("/tournaments");
+  revalidatePath(`/tournaments/${input.competitionId}`);
+
+  return result;
+}
+
+export async function unregisterFromTournamentAction(input: { competitionId: string }) {
+  const viewer = await requireCurrentViewer();
+  const result = await db.transaction(async (tx) => {
+    const competitionData = await getCompetitionForManagement(input.competitionId, tx);
+
+    if (!competitionData) {
+      return buildTournamentActionError("Турнир не найден.");
+    }
+
+    const bracket = await listCompetitionMatches(input.competitionId, tx);
+    const runtimeState = resolveTournamentRuntimeState({
+      hasBracket: bracket.length > 0,
+      scheduledAt: competitionData.competition.scheduledAt,
+      status: competitionData.competition.status as TournamentStatus,
+    });
+
+    const invalidStateMessage = buildTournamentStateMessage(runtimeState, ["registration"]);
+
+    if (invalidStateMessage) {
+      return buildTournamentActionError(invalidStateMessage);
+    }
+
+    if (runtimeState.hasBracket) {
+      return buildTournamentActionError("Нельзя отменить регистрацию после генерации сетки.");
+    }
+
+    const participant = await getParticipantByProfileAndActivity(
+      viewer.profileId,
+      competitionData.competition.activityTypeId,
+      tx,
+    );
+
+    if (!participant || !participant.isActive) {
+      return buildTournamentActionError("Активный участник не найден.");
+    }
+
+    const [removedParticipant] = await tx
+      .delete(schema.competitionParticipants)
+      .where(
+        and(
+          eq(schema.competitionParticipants.competitionId, input.competitionId),
+          eq(schema.competitionParticipants.participantId, participant.id),
+        ),
+      )
+      .returning();
+
+    if (!removedParticipant) {
+      return buildTournamentActionError("Вы не зарегистрированы в этом турнире.");
+    }
+
+    return buildTournamentActionSuccess("Регистрация отменена.");
   });
 
   revalidatePath("/tournaments");
@@ -749,16 +1089,19 @@ export async function cancelTournamentAction(input: { competitionId: string }) {
       return competitionResult;
     }
 
-    const competitionStatus = competitionResult.competitionData.competition.status;
-
-    if (competitionStatus !== "in_progress") {
+    if (competitionResult.runtimeState.isTerminal) {
       return buildTournamentActionError(
-        "Отмена доступна только для турнира в статусе «идет».",
+        "Для завершенного или отмененного турнира это действие недоступно.",
       );
     }
 
-    const existingMatches = await listCompetitionMatches(input.competitionId, tx);
-    const hasPlayedCompletedMatches = existingMatches.some(
+    if (competitionResult.runtimeState.status === "draft") {
+      return buildTournamentActionError(
+        "Черновик можно удалить, а не отменить.",
+      );
+    }
+
+    const hasPlayedCompletedMatches = competitionResult.bracket.some(
       (match) =>
         match.competitionMatch.status === "completed" &&
         match.competitionMatch.resolutionType === "played",
@@ -816,12 +1159,6 @@ export async function saveTournamentMatchResultAction(input: {
 
     if (competitionMatch.competitionMatch.competitionId !== input.competitionId) {
       return buildTournamentActionError("Матч не принадлежит указанному турниру.");
-    }
-
-    if (competitionMatch.competition.status !== "in_progress") {
-      return buildTournamentActionError(
-        "Ввод результата доступен только для турнира в статусе «идет».",
-      );
     }
 
     if (competitionMatch.competitionMatch.status === "completed") {

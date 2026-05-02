@@ -19,6 +19,7 @@ type CreateCompetitionInput = Pick<
   | "createdByProfileId"
   | "format"
   | "status"
+  | "maxParticipants"
   | "scheduledAt"
   | "location"
   | "startedAt"
@@ -37,6 +38,7 @@ function buildCompetitionSummaryQuery(database?: DbExecutor) {
         format: competitions.format,
         matchFormat: competitions.matchFormat,
         status: competitions.status,
+        maxParticipants: competitions.maxParticipants,
         scheduledAt: competitions.scheduledAt,
         location: competitions.location,
         createdByProfileId: competitions.createdByProfileId,
@@ -117,7 +119,13 @@ export async function listCompetitionsVisibleToOrganizerAll(
       and(
         eq(competitions.activityTypeId, activityTypeId),
         or(
-          inArray(competitions.status, ["in_progress", "completed", "cancelled"]),
+          inArray(competitions.status, [
+            "registration",
+            "ready",
+            "in_progress",
+            "completed",
+            "cancelled",
+          ]),
           and(
             eq(competitions.status, "draft"),
             eq(competitions.createdByProfileId, ownerProfileId),
@@ -198,6 +206,7 @@ export async function getCompetitionForManagement(
         format: competitions.format,
         matchFormat: competitions.matchFormat,
         status: competitions.status,
+        maxParticipants: competitions.maxParticipants,
         scheduledAt: competitions.scheduledAt,
         location: competitions.location,
         createdByProfileId: competitions.createdByProfileId,

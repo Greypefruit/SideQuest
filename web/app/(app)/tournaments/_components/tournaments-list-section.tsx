@@ -3,19 +3,25 @@
 import Link from "next/link";
 import { useSearchParams } from "next/navigation";
 import { useEffect, useState } from "react";
+import {
+  getTournamentListBadge,
+  getTournamentStatusChipUi,
+} from "@/src/tournaments/display-state";
+import type { TournamentRuntimeState } from "@/src/tournaments/runtime-state";
 
 const TOURNAMENTS_PAGE_SIZE_DESKTOP = 20;
 const TOURNAMENTS_PAGE_SIZE_MOBILE = 10;
 
 type TournamentTab = "my" | "all";
-type TournamentStatus = "draft" | "in_progress" | "completed" | "cancelled";
 
 type TournamentListEntry = {
+  hasBracket: boolean;
   id: string;
+  isViewerParticipant: boolean;
   matchFormat: "BO1" | "BO3" | "BO5";
   participantsCount: number;
+  runtimeState: TournamentRuntimeState;
   scheduledAt: string | null;
-  status: TournamentStatus;
   title: string;
 };
 
@@ -88,7 +94,6 @@ function buildTournamentsHref(
   activeTab: TournamentTab,
   page: number,
   options?: {
-    competitionId?: string;
     create?: boolean;
   },
 ) {
@@ -102,10 +107,6 @@ function buildTournamentsHref(
 
   if (options?.create) {
     params.set("create", "1");
-  }
-
-  if (options?.competitionId) {
-    params.set("competition", options.competitionId);
   }
 
   const query = params.toString();
@@ -130,31 +131,6 @@ function formatParticipantsLabel(count: number) {
   }
 
   return `${count} участников`;
-}
-
-function getStatusUi(status: TournamentStatus) {
-  switch (status) {
-    case "draft":
-      return {
-        label: "ЧЕРНОВИК",
-        className: "border border-slate-300 bg-slate-100 text-slate-600",
-      };
-    case "in_progress":
-      return {
-        label: "ИДЕТ",
-        className: "border border-blue-200 bg-white/85 text-blue-700",
-      };
-    case "completed":
-      return {
-        label: "ЗАВЕРШЕН",
-        className: "bg-slate-200 text-slate-700",
-      };
-    case "cancelled":
-      return {
-        label: "ОТМЕНЕН",
-        className: "border border-red-200 bg-red-50 text-red-700",
-      };
-  }
 }
 
 function formatTournamentScheduledAt(value: string | null) {
@@ -183,20 +159,27 @@ function formatTournamentScheduledAt(value: string | null) {
   return `${datePart} · ${hours}:${minutes}`;
 }
 
-function TournamentCard({
-  activeTab,
-  currentPage,
-  entry,
-}: {
-  activeTab: TournamentTab;
-  currentPage: number;
-  entry: TournamentListEntry;
-}) {
-  const statusUi = getStatusUi(entry.status);
+function TournamentCard({ entry }: { entry: TournamentListEntry }) {
+  const statusUi =
+    getTournamentListBadge({
+      hasBracket: entry.hasBracket,
+      isViewerParticipant: entry.isViewerParticipant,
+      runtimeState: entry.runtimeState,
+    }) ?? getTournamentStatusChipUi(entry.runtimeState);
   const scheduledAtText = formatTournamentScheduledAt(entry.scheduledAt);
+  const isCompleted = entry.runtimeState.status === "completed";
+  const isCancelled = entry.runtimeState.status === "cancelled";
 
   return (
-    <article className="relative rounded-[var(--radius-default)] border border-[#D9E2F0] bg-white px-4 py-4 shadow-[0_10px_24px_rgba(15,23,42,0.03)] transition-[background-color,border-color,transform] duration-150 ease-out hover:-translate-y-px hover:border-blue-200 hover:bg-blue-50 active:border-blue-300 active:bg-blue-100">
+    <article
+      className={`relative rounded-[var(--radius-default)] border px-4 py-4 shadow-[0_10px_24px_rgba(15,23,42,0.03)] transition-[background-color,border-color,transform] duration-150 ease-out ${
+        isCompleted
+          ? "border-slate-300 bg-slate-100 hover:border-slate-400 hover:bg-slate-150 active:border-slate-400 active:bg-slate-150"
+          : isCancelled
+            ? "border-rose-200 bg-rose-50 hover:border-rose-300 hover:bg-rose-100 active:border-rose-300 active:bg-rose-100"
+          : "border-[#D9E2F0] bg-white hover:-translate-y-px hover:border-blue-200 hover:bg-blue-50 active:border-blue-300 active:bg-blue-100"
+      }`}
+    >
       <Link
         aria-label={`Открыть турнир «${entry.title}»`}
         className="absolute inset-0 z-10 md:hidden"
@@ -205,7 +188,7 @@ function TournamentCard({
       <Link
         aria-label={`Открыть турнир «${entry.title}»`}
         className="absolute inset-0 z-10 hidden md:block"
-        href={buildTournamentsHref(activeTab, currentPage, { competitionId: entry.id })}
+        href={`/tournaments/${entry.id}`}
       />
 
       <div className="flex items-start justify-between gap-4 md:gap-6">
@@ -492,8 +475,6 @@ export function TournamentsListSection({
             {currentEntries.map((entry) => (
               <TournamentCard
                 key={entry.id}
-                activeTab={activeTab}
-                currentPage={currentPage}
                 entry={entry}
               />
             ))}

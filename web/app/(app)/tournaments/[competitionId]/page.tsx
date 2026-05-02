@@ -1,6 +1,6 @@
 import { redirect } from "next/navigation";
 import { requireCurrentViewer } from "@/src/auth/current-viewer";
-import { TournamentDetailSheet } from "../_components/tournament-detail-sheet";
+import { TournamentDetailView } from "../_components/tournament-detail-view";
 import { getTournamentDetailData } from "../detail-data";
 
 type TournamentDetailPageProps = {
@@ -21,22 +21,22 @@ export default async function TournamentDetailPage({
   }
 
   return (
-    <TournamentDetailSheet
-      bracket={detailData.bracket}
-      canManageDraft={detailData.canManageDraft}
+    <TournamentDetailView
       closeHref="/tournaments"
       competition={{
         activityName: detailData.competitionData.activityType.nameRu,
-        createdByProfileId: detailData.competitionData.competition.createdByProfileId,
         id: detailData.competitionData.competition.id,
         location: detailData.competitionData.competition.location,
         matchFormat: detailData.competitionData.competition.matchFormat,
+        maxParticipants: detailData.competitionData.competition.maxParticipants,
         organizerName: detailData.competitionData.owner.displayName,
         scheduledAt: detailData.competitionData.competition.scheduledAt
           ? detailData.competitionData.competition.scheduledAt.toISOString()
           : null,
         status: detailData.competitionData.competition.status as
           | "draft"
+          | "registration"
+          | "ready"
           | "in_progress"
           | "completed"
           | "cancelled",
@@ -44,8 +44,10 @@ export default async function TournamentDetailPage({
       }}
       participantOptions={detailData.participantOptions}
       participants={detailData.participants}
-      presentation="page"
-      viewer={viewer}
+      permissions={detailData.permissions}
+      rounds={detailData.rounds}
+      runtimeState={detailData.runtimeState}
+      viewerRegistration={detailData.viewerRegistration}
     />
   );
 }

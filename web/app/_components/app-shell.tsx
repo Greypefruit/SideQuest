@@ -63,6 +63,10 @@ function getPageTitle(pathname: string) {
     return "Главная";
   }
 
+  if (pathname === "/tournaments/create") {
+    return "Создание турнира";
+  }
+
   if (pathname === "/matches") {
     return "Матчи";
   }
