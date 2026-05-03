@@ -5,6 +5,7 @@ import { useRouter } from "next/navigation";
 import { useActionState, useEffect } from "react";
 import { useFormStatus } from "react-dom";
 import { createTournamentAction } from "../actions";
+import { MatchFormatTooltipWithAlign } from "./match-format-tooltip";
 import { TournamentFormatTooltip } from "./tournament-format-tooltip";
 
 type CreateTournamentSheetProps = {
@@ -183,8 +184,9 @@ export function CreateTournamentSheet({
             </div>
 
             <fieldset className="space-y-2">
-              <legend className="block text-[0.68rem] font-semibold uppercase tracking-[0.08em] text-slate-500">
-                Формат матчей
+              <legend className="flex items-center gap-1.5 text-[0.68rem] font-semibold uppercase tracking-[0.08em] text-slate-500">
+                <span>Формат матчей</span>
+                <MatchFormatTooltipWithAlign align="left" />
               </legend>
               <div className="grid grid-cols-3 gap-2">
                 {(["BO1", "BO3", "BO5"] as const).map((format, index) => (

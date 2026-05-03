@@ -21,6 +21,7 @@ import { type TournamentRuntimeState, type TournamentStatus } from "@/src/tourna
 import {
   getTournamentStatusChipUi,
 } from "@/src/tournaments/display-state";
+import { MatchFormatTooltip } from "./match-format-tooltip";
 import { TournamentBracketView } from "./tournament-bracket-view";
 import { TournamentFormatTooltip } from "./tournament-format-tooltip";
 type TournamentTab = "overview" | "participants" | "bracket";
@@ -387,7 +388,7 @@ function DraftOverviewEditor({
     {
       label: "Формат матча",
       value: isEditable ? (
-        <div className="flex flex-wrap gap-2">
+        <div className="flex flex-wrap items-center gap-2">
           {(["BO1", "BO3", "BO5"] as const).map((format) => (
             <button
               key={format}
@@ -402,9 +403,13 @@ function DraftOverviewEditor({
               {format}
             </button>
           ))}
+          <MatchFormatTooltip />
         </div>
       ) : (
-        <p className="text-[0.84rem] font-semibold text-slate-800">{initialMatchFormat}</p>
+        <div className="flex items-center gap-2">
+          <p className="text-[0.84rem] font-semibold text-slate-800">{initialMatchFormat}</p>
+          <MatchFormatTooltip />
+        </div>
       ),
     },
     {
