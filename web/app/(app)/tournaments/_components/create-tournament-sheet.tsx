@@ -5,6 +5,7 @@ import { useRouter } from "next/navigation";
 import { useActionState, useEffect } from "react";
 import { useFormStatus } from "react-dom";
 import { createTournamentAction } from "../actions";
+import { TournamentFormatTooltip } from "./tournament-format-tooltip";
 
 type CreateTournamentSheetProps = {
   closeHref: string;
@@ -14,6 +15,15 @@ type CreateTournamentSheetProps = {
 const INITIAL_FORM_STATE = {
   error: null as string | null,
 };
+
+function getTodayDateInputValue() {
+  const now = new Date();
+  const year = String(now.getFullYear());
+  const month = String(now.getMonth() + 1).padStart(2, "0");
+  const day = String(now.getDate()).padStart(2, "0");
+
+  return `${year}-${month}-${day}`;
+}
 
 function CloseIcon() {
   return (
@@ -62,6 +72,7 @@ export function CreateTournamentSheet({
 }: CreateTournamentSheetProps) {
   const router = useRouter();
   const [state, formAction] = useActionState(createTournamentAction, INITIAL_FORM_STATE);
+  const minScheduledDate = getTodayDateInputValue();
 
   useEffect(() => {
     if (!isOpen) {
@@ -159,11 +170,14 @@ export function CreateTournamentSheet({
               </div>
 
               <div className="rounded-[var(--radius-default)] border border-slate-200 bg-slate-50 px-3.5 py-3">
-                <p className="text-[0.68rem] font-semibold uppercase tracking-[0.08em] text-slate-500">
-                  Формат турнира
-                </p>
+                <div className="flex items-center gap-1.5">
+                  <p className="text-[0.68rem] font-semibold uppercase tracking-[0.08em] text-slate-500">
+                    Формат турнира
+                  </p>
+                  <TournamentFormatTooltip />
+                </div>
                 <p className="mt-1 text-[0.95rem] font-medium text-slate-900 md:text-[0.92rem]">
-                  На выбывание
+                  На выбывание (Посев)
                 </p>
               </div>
             </div>
@@ -201,6 +215,7 @@ export function CreateTournamentSheet({
                 <input
                   id="scheduledDate"
                   name="scheduledDate"
+                  min={minScheduledDate}
                   type="date"
                   className="min-h-11 w-full rounded-[var(--radius-default)] border border-slate-200 px-3.5 text-[0.95rem] text-slate-900 outline-none transition focus:border-blue-400 focus:ring-2 focus:ring-blue-100 md:min-h-10 md:text-[0.92rem]"
                 />

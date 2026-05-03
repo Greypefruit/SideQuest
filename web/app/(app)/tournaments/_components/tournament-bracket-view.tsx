@@ -35,10 +35,10 @@ type TournamentBracketViewProps = {
   rounds: BracketRound[];
 };
 
-const MATCH_HEIGHT = 104;
-const BASE_VERTICAL_GAP = 24;
+const MATCH_HEIGHT = 118;
+const BASE_VERTICAL_GAP = 12;
 const COLUMN_WIDTH = 238;
-const COLUMN_GAP = 64;
+const COLUMN_GAP = 40;
 
 function getBracketColumnLabel(roundIndex: number, totalRounds: number) {
   const roundsToFinish = totalRounds - roundIndex - 1;

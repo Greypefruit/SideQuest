@@ -200,7 +200,7 @@ function TournamentCard({ entry }: { entry: TournamentListEntry }) {
           </div>
 
           <p className="mt-2 text-[0.9rem] leading-6 text-slate-500">
-            Настольный теннис · На выбывание · {entry.matchFormat}
+            Настольный теннис · На выбывание (Посев) · {entry.matchFormat}
           </p>
 
           <div className="mt-3 flex items-center gap-4">

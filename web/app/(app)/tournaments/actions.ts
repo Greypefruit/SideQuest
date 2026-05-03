@@ -120,6 +120,26 @@ function parseOptionalScheduledAt(rawDate: string, rawTime: string) {
     };
   }
 
+  const now = new Date();
+
+  if (timeValue) {
+    if (scheduledAt.getTime() < now.getTime()) {
+      return {
+        ok: false as const,
+        message: "Нельзя указать прошедшие дату и время турнира.",
+      };
+    }
+  } else {
+    const today = new Date(now.getFullYear(), now.getMonth(), now.getDate(), 0, 0, 0, 0);
+
+    if (scheduledAt.getTime() < today.getTime()) {
+      return {
+        ok: false as const,
+        message: "Нельзя указать прошедшую дату турнира.",
+      };
+    }
+  }
+
   return { ok: true as const, value: scheduledAt };
 }
 

@@ -22,6 +22,7 @@ import {
   getTournamentStatusChipUi,
 } from "@/src/tournaments/display-state";
 import { TournamentBracketView } from "./tournament-bracket-view";
+import { TournamentFormatTooltip } from "./tournament-format-tooltip";
 type TournamentTab = "overview" | "participants" | "bracket";
 type MatchFormat = "BO1" | "BO3" | "BO5";
 type WinnerKey = "player1" | "player2";
@@ -131,6 +132,27 @@ type DraftOverviewEditorProps = {
 type MatchScore = {
   player1: number;
   player2: number;
+};
+
+const SCORE_OPTIONS: Record<MatchFormat, MatchScore[]> = {
+  BO1: [
+    { player1: 1, player2: 0 },
+    { player1: 0, player2: 1 },
+  ],
+  BO3: [
+    { player1: 2, player2: 0 },
+    { player1: 2, player2: 1 },
+    { player1: 0, player2: 2 },
+    { player1: 1, player2: 2 },
+  ],
+  BO5: [
+    { player1: 3, player2: 0 },
+    { player1: 3, player2: 1 },
+    { player1: 3, player2: 2 },
+    { player1: 0, player2: 3 },
+    { player1: 1, player2: 3 },
+    { player1: 2, player2: 3 },
+  ],
 };
 
 function BackArrowIcon() {
@@ -264,6 +286,15 @@ function formatStateStartDateTime(value: string | null) {
   return `${day}.${month}.${year} в ${hours}:${minutes}`;
 }
 
+function getTodayDateInputValue() {
+  const now = new Date();
+  const year = String(now.getFullYear());
+  const month = String(now.getMonth() + 1).padStart(2, "0");
+  const day = String(now.getDate()).padStart(2, "0");
+
+  return `${year}-${month}-${day}`;
+}
+
 function getCompletedTournamentSummary(rounds: TournamentRound[]) {
   const finalRound = rounds.at(-1);
   const finalMatch = finalRound?.matches[0];
@@ -330,6 +361,7 @@ function DraftOverviewEditor({
   const [scheduledTime, setScheduledTime] = useState(initialScheduled.time);
   const [location, setLocation] = useState(initialLocation ?? "");
   const [message, setMessage] = useState<string | null>(null);
+  const minScheduledDate = getTodayDateInputValue();
   const dateValue = formatScheduledDate(initialScheduledAt);
   const timeValue = formatScheduledTime(initialScheduledAt);
   const destructiveButtonLabel = canDeleteTournament ? "Удалить турнир" : "Отменить турнир";
@@ -344,7 +376,12 @@ function DraftOverviewEditor({
     {
       label: "Формат турнира",
       value: (
-        <p className="text-[0.84rem] font-semibold text-slate-800">На выбывание</p>
+        <div className="flex items-center gap-2">
+          <p className="text-[0.84rem] font-semibold text-slate-800">
+            На выбывание (Посев)
+          </p>
+          <TournamentFormatTooltip />
+        </div>
       ),
     },
     {
@@ -376,6 +413,7 @@ function DraftOverviewEditor({
         <div className="grid gap-2 sm:grid-cols-2">
           <input
             id="tournament-date"
+            min={minScheduledDate}
             type="date"
             value={scheduledDate}
             onChange={(event) => setScheduledDate(event.target.value)}
@@ -439,7 +477,7 @@ function DraftOverviewEditor({
 
   return (
     <div className="space-y-4">
-      <div className="hidden overflow-hidden rounded-[var(--radius-default)] border border-slate-200/90 bg-white md:block">
+      <div className="hidden rounded-[var(--radius-default)] border border-slate-200/90 bg-white md:block">
         <div className="overflow-x-auto">
           <table className="min-w-full border-collapse">
             <tbody>
@@ -576,6 +614,9 @@ function ResultModal({
   onSubmit: (payload: { score: MatchScore; winnerParticipantId: string }) => void;
 }) {
   const [winnerKey, setWinnerKey] = useState<WinnerKey>("player1");
+  const [selectedScore, setSelectedScore] = useState<MatchScore | null>(() =>
+    getDefaultWinningScore(format, "player1"),
+  );
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
@@ -594,6 +635,9 @@ function ResultModal({
 
   const winnerParticipantId =
     winnerKey === "player1" ? match.slot1.participantId : match.slot2.participantId;
+  const availableScores = SCORE_OPTIONS[format].filter((score) =>
+    winnerKey === "player1" ? score.player1 > score.player2 : score.player2 > score.player1,
+  );
 
   return (
     <div
@@ -639,6 +683,7 @@ function ResultModal({
                   type="button"
                   onClick={() => {
                     setWinnerKey(option.key);
+                    setSelectedScore(getDefaultWinningScore(format, option.key));
                     setError(null);
                   }}
                   className={`inline-flex min-h-11 items-center justify-start rounded-[8px] border px-3.5 text-left text-[0.92rem] font-medium transition ${
@@ -650,6 +695,37 @@ function ResultModal({
                   {option.label}
                 </button>
               ))}
+            </div>
+          </div>
+
+          <div className="space-y-2">
+            <p className="text-[0.68rem] font-semibold uppercase tracking-[0.08em] text-slate-500">
+              Счет
+            </p>
+            <div className="flex flex-wrap gap-2">
+              {availableScores.map((score) => {
+                const isSelected =
+                  selectedScore?.player1 === score.player1 &&
+                  selectedScore?.player2 === score.player2;
+
+                return (
+                  <button
+                    key={`${score.player1}:${score.player2}`}
+                    type="button"
+                    onClick={() => {
+                      setSelectedScore(score);
+                      setError(null);
+                    }}
+                    className={`inline-flex min-h-10 items-center justify-center rounded-full border px-3 text-[0.88rem] font-semibold transition ${
+                      isSelected
+                        ? "border-blue-500 bg-blue-50 text-blue-700"
+                        : "border-slate-200 bg-white text-slate-600 hover:bg-slate-50"
+                    }`}
+                  >
+                    {score.player1}:{score.player2}
+                  </button>
+                );
+              })}
             </div>
           </div>
 
@@ -676,8 +752,13 @@ function ResultModal({
                   return;
                 }
 
+                if (!selectedScore) {
+                  setError("Выберите счет.");
+                  return;
+                }
+
                 onSubmit({
-                  score: getDefaultWinningScore(format, winnerKey),
+                  score: selectedScore,
                   winnerParticipantId,
                 });
               }}
@@ -1142,11 +1223,11 @@ export function TournamentDetailView({
                     className="rounded-[var(--radius-default)] border border-slate-200 bg-slate-50/70 px-3.5 py-3"
                   >
                     <div className="flex items-start justify-between gap-3">
-                      <div className="min-w-0">
-                        <p className="text-[0.72rem] font-semibold uppercase tracking-[0.08em] text-slate-500">
+                      <div className="flex min-w-0 items-center gap-2">
+                        <span className="shrink-0 text-[0.82rem] font-semibold text-slate-500">
                           № {participant.seed !== null ? String(participant.seed).padStart(2, "0") : String(index + 1).padStart(2, "0")}
-                        </p>
-                        <p className="mt-1 text-[0.96rem] font-semibold text-slate-900">
+                        </span>
+                        <p className="truncate text-[0.96rem] font-semibold text-slate-900">
                           {participant.displayName}
                         </p>
                       </div>
