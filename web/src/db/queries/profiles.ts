@@ -1,5 +1,5 @@
 import "server-only";
-import { eq } from "drizzle-orm";
+import { and, asc, desc, eq, sql } from "drizzle-orm";
 import { type DbExecutor } from "../index";
 import { profiles } from "../schema";
 import { eqNormalizedEmail, getDb, hasValues, normalizeEmail } from "./shared";
@@ -15,6 +15,11 @@ type UpdateProfileInput = Partial<
     typeof profiles.$inferInsert,
     "displayName" | "email" | "firstName" | "lastName" | "role" | "isActive"
   >
+>;
+
+export type AdminProfilesListItem = Pick<
+  typeof profiles.$inferSelect,
+  "id" | "displayName" | "email" | "role" | "isActive"
 >;
 
 export async function getProfileById(profileId: string, database?: DbExecutor) {
@@ -148,4 +153,55 @@ export async function getProfileRole(profileId: string, database?: DbExecutor) {
   const profile = await getProfileById(profileId, database);
 
   return profile?.role ?? null;
+}
+
+export async function listProfilesForAdmin(database?: DbExecutor) {
+  return getDb(database)
+    .select({
+      id: profiles.id,
+      displayName: profiles.displayName,
+      email: profiles.email,
+      role: profiles.role,
+      isActive: profiles.isActive,
+    })
+    .from(profiles)
+    .orderBy(
+      desc(profiles.isActive),
+      sql`case
+        when ${profiles.role} = 'admin' then 0
+        when ${profiles.role} = 'organizer' then 1
+        else 2
+      end`,
+      asc(profiles.displayName),
+      asc(profiles.email),
+    );
+}
+
+export async function countActiveAdminProfiles(database?: DbExecutor) {
+  const [result] = await getDb(database)
+    .select({
+      count: sql<number>`count(*)::int`,
+    })
+    .from(profiles)
+    .where(and(eq(profiles.role, "admin"), eq(profiles.isActive, true)));
+
+  return result?.count ?? 0;
+}
+
+export async function lockProfileByIdForUpdate(
+  profileId: string,
+  database: DbExecutor,
+) {
+  await getDb(database).execute(
+    sql`select ${profiles.id} from ${profiles} where ${profiles.id} = ${profileId} for update`,
+  );
+}
+
+export async function lockActiveAdminProfilesForUpdate(database: DbExecutor) {
+  await getDb(database).execute(
+    sql`select ${profiles.id}
+        from ${profiles}
+        where ${profiles.role} = 'admin' and ${profiles.isActive} = true
+        for update`,
+  );
 }

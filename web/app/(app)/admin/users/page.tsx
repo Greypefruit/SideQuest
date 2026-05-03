@@ -1,18 +1,36 @@
-import { PagePlaceholder } from "../../../_components/page-placeholder";
 import { requireAdminViewer } from "@/src/auth/current-viewer";
+import { countActiveAdminProfiles, listProfilesForAdmin } from "@/src/db/queries";
+import { UsersAdminPanel } from "./_components/users-admin-panel";
 
 export default async function AdminUsersPage() {
-  await requireAdminViewer();
+  const viewer = await requireAdminViewer();
+  const [users, activeAdminCount] = await Promise.all([
+    listProfilesForAdmin(),
+    countActiveAdminProfiles(),
+  ]);
 
   return (
-    <PagePlaceholder
-      title="Администрирование пользователей"
-      description="Этот раздел виден только администраторам и уже защищен от прямого доступа по URL для остальных ролей. Полный сценарий управления пользователями будет добавлен на отдельном этапе Release 1."
-      details={[
-        { label: "Доступ", value: "Только Admin" },
-        { label: "Секция", value: "Пользователи" },
-        { label: "Состояние", value: "Маршрут защищен" },
-      ]}
-    />
+    <div className="md:mx-auto md:max-w-[860px]">
+      <div className="space-y-4 md:space-y-5">
+        <section className="hidden space-y-1 md:block">
+          <h1 className="text-[1.75rem] font-semibold tracking-tight text-slate-950">
+            Администрирование пользователей
+          </h1>
+        </section>
+
+        <UsersAdminPanel
+          users={users.map((user) => ({
+            id: user.id,
+            displayName: user.displayName,
+            email: user.email,
+            role: user.role,
+            isActive: user.isActive,
+            isCurrentViewer: user.id === viewer.profileId,
+            isProtectedLastActiveAdmin:
+              activeAdminCount === 1 && user.role === "admin" && user.isActive,
+          }))}
+        />
+      </div>
+    </div>
   );
 }

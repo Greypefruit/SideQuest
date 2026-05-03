@@ -58,7 +58,7 @@ function isActivePath(pathname: string, href: string) {
   return pathname === href || pathname.startsWith(`${href}/`);
 }
 
-function getPageTitle(pathname: string) {
+function getPageTitle(pathname: string, viewport: "mobile" | "desktop") {
   if (pathname === "/") {
     return "Главная";
   }
@@ -84,7 +84,7 @@ function getPageTitle(pathname: string) {
   }
 
   if (pathname.startsWith("/admin/users")) {
-    return "Администрирование пользователей";
+    return viewport === "mobile" ? "Пользователи" : "Администрирование пользователей";
   }
 
   return "SideQuest";
@@ -107,7 +107,7 @@ export function AppShell({ viewer, children }: AppShellProps) {
           </Link>
 
           <nav className="flex items-center gap-1" aria-label="Основная навигация">
-            {desktopNavItems.map((item) => {
+              {desktopNavItems.map((item) => {
               const isActive = isActivePath(pathname, item.href);
 
               return (
@@ -134,7 +134,7 @@ export function AppShell({ viewer, children }: AppShellProps) {
         >
           <div className="min-w-0">
             <p className="truncate text-[1.75rem] font-semibold tracking-tight text-slate-950">
-              {getPageTitle(pathname)}
+              {getPageTitle(pathname, "mobile")}
             </p>
           </div>
 
