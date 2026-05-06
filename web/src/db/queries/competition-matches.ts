@@ -1,5 +1,5 @@
 import "server-only";
-import { and, asc, eq } from "drizzle-orm";
+import { and, asc, desc, eq, or } from "drizzle-orm";
 import { alias } from "drizzle-orm/pg-core";
 import { type DbExecutor } from "../index";
 import { competitionMatches, competitions, participants, profiles } from "../schema";
@@ -269,5 +269,45 @@ export async function listCompletedCompetitionMatches(
       asc(competitionMatches.roundNumber),
       asc(competitionMatches.matchNumber),
       asc(competitionMatches.createdAt),
+    );
+}
+
+export async function listCompletedCompetitionMatchesByActivity(
+  activityTypeId: string,
+  database?: DbExecutor,
+) {
+  return buildCompetitionMatchesQuery(database)
+    .where(
+      and(
+        eq(competitions.activityTypeId, activityTypeId),
+        eq(competitionMatches.status, "completed"),
+      ),
+    )
+    .orderBy(
+      desc(competitionMatches.completedAt),
+      desc(competitionMatches.createdAt),
+      desc(competitionMatches.roundNumber),
+      desc(competitionMatches.matchNumber),
+    );
+}
+
+export async function listProfileCompetitionMatches(
+  profileId: string,
+  activityTypeId: string,
+  database?: DbExecutor,
+) {
+  return buildCompetitionMatchesQuery(database)
+    .where(
+      and(
+        eq(competitions.activityTypeId, activityTypeId),
+        eq(competitionMatches.status, "completed"),
+        or(eq(slot1Participant.profileId, profileId), eq(slot2Participant.profileId, profileId)),
+      ),
+    )
+    .orderBy(
+      desc(competitionMatches.completedAt),
+      desc(competitionMatches.createdAt),
+      desc(competitionMatches.roundNumber),
+      desc(competitionMatches.matchNumber),
     );
 }

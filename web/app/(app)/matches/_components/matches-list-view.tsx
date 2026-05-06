@@ -410,7 +410,7 @@ export function MatchesListView({
               type="button"
             >
               <PlusIcon />
-              Создать матч
+              Записать матч
             </button>
           </div>
 
@@ -431,7 +431,7 @@ export function MatchesListView({
                   type="button"
                 >
                   <PlusIcon />
-                  Создать матч
+                  Записать матч
                 </button>
               </div>
             </div>

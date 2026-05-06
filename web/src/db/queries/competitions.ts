@@ -1,5 +1,6 @@
 import "server-only";
 import { and, desc, eq, inArray, or, sql } from "drizzle-orm";
+import { alias } from "drizzle-orm/pg-core";
 import { type DbExecutor } from "../index";
 import {
   activityTypes,
@@ -27,6 +28,12 @@ type CreateCompetitionInput = Pick<
 >;
 
 type CompetitionStatus = typeof competitions.$inferSelect.status;
+
+const membershipCompetitionParticipants = alias(
+  competitionParticipants,
+  "membership_competition_participants",
+);
+const membershipParticipants = alias(participants, "membership_participants");
 
 function buildCompetitionSummaryQuery(database?: DbExecutor) {
   return getDb(database)
@@ -171,11 +178,18 @@ export async function listProfileCompetitions(
   database?: DbExecutor,
 ) {
   return buildCompetitionSummaryQuery(database)
-    .innerJoin(participants, eq(competitionParticipants.participantId, participants.id))
+    .innerJoin(
+      membershipCompetitionParticipants,
+      eq(membershipCompetitionParticipants.competitionId, competitions.id),
+    )
+    .innerJoin(
+      membershipParticipants,
+      eq(membershipCompetitionParticipants.participantId, membershipParticipants.id),
+    )
     .where(
       and(
-        eq(participants.profileId, profileId),
-        eq(participants.activityTypeId, activityTypeId),
+        eq(membershipParticipants.profileId, profileId),
+        eq(membershipParticipants.activityTypeId, activityTypeId),
         eq(competitions.activityTypeId, activityTypeId),
       ),
     )

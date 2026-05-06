@@ -5,6 +5,7 @@ export * from "./competition-participants";
 export * from "./competitions";
 export * from "./matches";
 export * from "./participants";
+export * from "./player-home";
 export * from "./profiles";
 export * from "./rankings";
 export * from "./shared";

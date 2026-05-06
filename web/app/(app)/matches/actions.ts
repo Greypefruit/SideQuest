@@ -12,8 +12,7 @@ import {
   getProfileById,
   updateRankingByParticipantId,
 } from "@/src/db/queries";
-
-const ELO_K_FACTOR = 32;
+import { DEFAULT_ELO_RATING, calculateUpdatedRatings } from "@/src/rating/elo";
 const ALLOWED_MATCH_FORMATS = ["BO1", "BO3", "BO5"] as const;
 
 type MatchFormat = (typeof ALLOWED_MATCH_FORMATS)[number];
@@ -83,28 +82,10 @@ function getWinnerByScore(score: { player1: number; player2: number }): WinnerKe
   return score.player1 > score.player2 ? "player1" : "player2";
 }
 
-function calculateUpdatedRatings(
-  player1Rating: number,
-  player2Rating: number,
-  winner: WinnerKey,
-) {
-  const player1ActualScore = winner === "player1" ? 1 : 0;
-  const player1ExpectedScore =
-    1 / (1 + 10 ** ((player2Rating - player1Rating) / 400));
-  const player1Delta = Math.round(
-    ELO_K_FACTOR * (player1ActualScore - player1ExpectedScore),
-  );
-
-  return {
-    player1Rating: player1Rating + player1Delta,
-    player2Rating: player2Rating - player1Delta,
-  };
-}
-
 function getDefaultRankingValues(participantId: string) {
   return {
     participantId,
-    rating: 1000,
+    rating: DEFAULT_ELO_RATING,
     matchesPlayed: 0,
     wins: 0,
     losses: 0,
