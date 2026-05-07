@@ -6,6 +6,7 @@ import {
   listCompetitionsByOwner,
   listProfileCompetitions,
   listCompetitionsVisibleToOrganizerAll,
+  getTournamentActionItemsForCompetitions,
 } from "@/src/db/queries";
 import {
   resolveTournamentRuntimeState,
@@ -32,7 +33,7 @@ const PLAYER_VISIBLE_STATUSES = [
 
 type CompetitionListEntry = Awaited<ReturnType<typeof listCompetitionsByActivity>>[number];
 
-type TournamentTab = "my" | "all";
+type TournamentTab = "my" | "all" | "actions";
 
 type TournamentsPageProps = {
   searchParams?: Promise<{
@@ -57,6 +58,10 @@ function getSingleSearchParam(value: string | string[] | undefined) {
 }
 
 function parseTournamentTab(value: string | undefined): TournamentTab {
+  if (value === "actions") {
+    return "actions";
+  }
+
   return value === "all" ? "all" : "my";
 }
 
@@ -297,6 +302,12 @@ export default async function TournamentsPage({ searchParams }: TournamentsPageP
   const viewerCompetitionIds = new Set(
     viewerCompetitions.map((entry) => entry.competition.id),
   );
+  const actionSourceCompetitions = isAdmin ? sortedAllCompetitions : sortedMyCompetitions;
+  const actionEntries = isManager
+    ? await getTournamentActionItemsForCompetitions(actionSourceCompetitions, {
+        kinds: ["report_result", "generate_bracket"],
+      })
+    : [];
 
   const selectedCompetitions =
     isManager && activeTab === "my" ? sortedMyCompetitions : sortedAllCompetitions;
@@ -313,6 +324,7 @@ export default async function TournamentsPage({ searchParams }: TournamentsPageP
 
         <TournamentsListSection
           activeTab={activeTab}
+          actionEntries={actionEntries}
           entries={selectedCompetitions.map((entry) => {
             const runtimeState = resolveTournamentRuntimeState({
               hasBracket: entry.matchesCount > 0,

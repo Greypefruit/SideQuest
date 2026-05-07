@@ -12,8 +12,8 @@ import {
   type TournamentStatus,
 } from "@/src/tournaments/runtime-state";
 
-const PLAYER_HOME_TOURNAMENTS_LIMIT = 2;
-const PLAYER_HOME_RATING_CHANGES_LIMIT = 15;
+const PLAYER_HOME_TOURNAMENTS_LIMIT = 4;
+const PLAYER_HOME_RATING_CHANGES_LIMIT = 5;
 
 type ProfileCompetitionEntry = Awaited<ReturnType<typeof listProfileCompetitions>>[number];
 type ActivityMatchEntry = Awaited<ReturnType<typeof listMatchesByActivity>>[number];

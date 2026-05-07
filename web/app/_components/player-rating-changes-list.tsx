@@ -2,7 +2,7 @@
 
 import { useState } from "react";
 
-const INITIAL_VISIBLE_ITEMS = 4;
+const INITIAL_VISIBLE_ITEMS = 5;
 
 function ChevronUpIcon({ className = "" }: { className?: string }) {
   return (

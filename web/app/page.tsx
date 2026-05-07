@@ -1,7 +1,6 @@
 import { AuthFlow } from "./_components/auth-flow";
 import { AppShell } from "./_components/app-shell";
 import { PlayerHomeDashboard } from "./_components/player-home-dashboard";
-import { UserActivityRatingSummary } from "./_components/user-activity-rating-summary";
 import { getCurrentViewer } from "@/src/auth/current-viewer";
 
 export default async function Home() {
@@ -10,23 +9,7 @@ export default async function Home() {
   if (viewer) {
     return (
       <AppShell viewer={viewer}>
-        {viewer.role === "player" ? (
-          <PlayerHomeDashboard profileId={viewer.profileId} />
-        ) : (
-          <div className="mx-auto w-full max-w-[1040px] min-w-0 overflow-x-hidden">
-            <div className="space-y-3 md:mx-auto md:max-w-[860px] md:space-y-4">
-              <header className="hidden md:block">
-                <h1 className="text-[2rem] font-semibold tracking-tight text-slate-950">Главная</h1>
-                <p className="mt-1 max-w-2xl text-[0.9rem] leading-6 text-slate-500">
-                  Ключевой обзор по настольному теннису: текущая позиция в рейтинге и базовая
-                  статистика без перехода в профиль.
-                </p>
-              </header>
-
-              <UserActivityRatingSummary profileId={viewer.profileId} />
-            </div>
-          </div>
-        )}
+        <PlayerHomeDashboard profileId={viewer.profileId} />
       </AppShell>
     );
   }

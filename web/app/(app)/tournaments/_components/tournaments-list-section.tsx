@@ -3,6 +3,7 @@
 import Link from "next/link";
 import { useSearchParams } from "next/navigation";
 import { useEffect, useState } from "react";
+import type { TournamentActionItem } from "@/src/db/queries/tournament-actions";
 import {
   getTournamentListBadge,
   getTournamentStatusChipUi,
@@ -12,7 +13,7 @@ import type { TournamentRuntimeState } from "@/src/tournaments/runtime-state";
 const TOURNAMENTS_PAGE_SIZE_DESKTOP = 20;
 const TOURNAMENTS_PAGE_SIZE_MOBILE = 10;
 
-type TournamentTab = "my" | "all";
+type TournamentTab = "my" | "all" | "actions";
 
 type TournamentListEntry = {
   hasBracket: boolean;
@@ -27,6 +28,7 @@ type TournamentListEntry = {
 
 type TournamentsListSectionProps = {
   activeTab: TournamentTab;
+  actionEntries: TournamentActionItem[];
   entries: TournamentListEntry[];
   hasAnyVisibleCompetitions: boolean;
   isManager: boolean;
@@ -241,6 +243,91 @@ function TournamentCard({ entry }: { entry: TournamentListEntry }) {
   );
 }
 
+function formatAttentionDateTime(value: Date | null) {
+  if (!value) {
+    return "Дата уточняется";
+  }
+
+  const day = String(value.getDate()).padStart(2, "0");
+  const month = String(value.getMonth() + 1).padStart(2, "0");
+  const year = String(value.getFullYear()).slice(-2);
+  const hours = String(value.getHours()).padStart(2, "0");
+  const minutes = String(value.getMinutes()).padStart(2, "0");
+
+  if (hours === "00" && minutes === "00") {
+    return `${day}.${month}.${year}`;
+  }
+
+  return `${day}.${month}.${year} ${hours}:${minutes}`;
+}
+
+function AttentionStatus({
+  label,
+  tone,
+}: {
+  label: string;
+  tone: TournamentActionItem["statusTone"];
+}) {
+  const toneClassName =
+    tone === "red"
+      ? "border border-rose-200 bg-rose-50 text-rose-600"
+      : tone === "amber"
+        ? "border border-amber-200 bg-amber-50 text-amber-700"
+        : tone === "blue"
+          ? "border border-blue-200 bg-blue-50 text-blue-600"
+          : "border border-emerald-200 bg-emerald-50 text-emerald-700";
+
+  return (
+    <span
+      className={`inline-flex min-h-6 items-center rounded-[var(--radius-default)] px-2.5 text-[0.74rem] font-medium ${toneClassName}`}
+    >
+      {label}
+    </span>
+  );
+}
+
+function ActionTournamentCard({ item }: { item: TournamentActionItem }) {
+  return (
+    <Link
+      href={item.ctaHref}
+      className="block rounded-[var(--radius-default)] border border-slate-200/90 bg-white px-4 py-4 shadow-[0_10px_24px_rgba(15,23,42,0.03)] transition hover:border-blue-200 hover:bg-blue-50 md:px-5 md:py-4.5"
+    >
+      <div className="min-w-0">
+        <h3 className="text-[1.02rem] font-semibold leading-5 tracking-tight text-slate-900">
+          {item.title}
+        </h3>
+        <div className="mt-2 flex flex-wrap items-center gap-x-2 gap-y-1 text-[0.86rem] leading-5 text-slate-500">
+          <span>{formatAttentionDateTime(item.tournamentMeta.scheduledAt)}</span>
+          <span aria-hidden="true">·</span>
+          <span className="inline-flex items-center gap-1.5">
+            <svg aria-hidden="true" fill="none" height="16" viewBox="0 0 16 16" width="16">
+              <path
+                d="M5.333 6.333a2 2 0 1 1 0-4 2 2 0 0 1 0 4ZM10.667 7.667a1.667 1.667 0 1 0 0-3.334 1.667 1.667 0 0 0 0 3.334ZM2.667 12.667v-.334c0-1.472 1.194-2.666 2.666-2.666h.667c1.473 0 2.667 1.194 2.667 2.666v.334M9 12.667v-.334c0-1.104.895-2 2-2h.333c1.105 0 2 .896 2 2v.334"
+                stroke="currentColor"
+                strokeLinecap="round"
+                strokeLinejoin="round"
+                strokeWidth="1.2"
+              />
+            </svg>
+            {item.tournamentMeta.count}/{item.tournamentMeta.max}
+          </span>
+        </div>
+        {item.matchMeta ? (
+          <div className="mt-2 space-y-0.5 text-[0.86rem] leading-5 text-slate-500">
+            <p>{item.matchMeta.roundLabel}</p>
+            <p>{item.matchMeta.matchup}</p>
+          </div>
+        ) : item.detailLine ? (
+          <p className="mt-2 text-[0.86rem] leading-5 text-slate-500">{item.detailLine}</p>
+        ) : null}
+        <div className="mt-3">
+          <AttentionStatus label={item.statusLabel} tone={item.statusTone} />
+        </div>
+      </div>
+    </Link>
+  );
+}
+
 function EmptyState({
   title,
   description,
@@ -307,12 +394,18 @@ function ScopedEmptyState({ activeTab }: { activeTab: TournamentTab }) {
     <section className="rounded-[var(--radius-default)] border border-slate-200/90 bg-white px-5 py-7 text-center shadow-[0_10px_24px_rgba(15,23,42,0.03)]">
       <div className="mx-auto flex max-w-[26rem] flex-col items-center justify-center">
         <h2 className="text-[1rem] font-semibold tracking-tight text-slate-800">
-          {activeTab === "my" ? "У вас пока нет турниров" : "Список турниров пока пуст"}
+          {activeTab === "my"
+            ? "У вас пока нет турниров"
+            : activeTab === "actions"
+              ? "Сейчас нет турниров, требующих действия"
+              : "Список турниров пока пуст"}
         </h2>
         <p className="mt-1 whitespace-nowrap text-[0.9rem] leading-6 text-slate-500">
           {activeTab === "my"
             ? "Создайте первый турнир, чтобы он появился в разделе «Мои»."
-            : "Когда в системе появятся турниры, они будут отображаться здесь."}
+            : activeTab === "actions"
+              ? "Когда появятся турниры, где нужно внести результат или сгенерировать сетку, они будут здесь."
+              : "Когда в системе появятся турниры, они будут отображаться здесь."}
         </p>
       </div>
     </section>
@@ -393,6 +486,7 @@ function Pagination({
 
 export function TournamentsListSection({
   activeTab,
+  actionEntries,
   entries,
   hasAnyVisibleCompetitions,
   isManager,
@@ -409,6 +503,13 @@ export function TournamentsListSection({
   const currentPage = Math.min(currentPageFromUrl, totalPages);
   const pageStartIndex = (currentPage - 1) * pageSize;
   const currentEntries = entries.slice(pageStartIndex, pageStartIndex + pageSize);
+  const actionTotalPages = Math.max(1, Math.ceil(actionEntries.length / pageSize));
+  const actionCurrentPage = Math.min(currentPageFromUrl, actionTotalPages);
+  const actionPageStartIndex = (actionCurrentPage - 1) * pageSize;
+  const currentActionEntries = actionEntries.slice(
+    actionPageStartIndex,
+    actionPageStartIndex + pageSize,
+  );
   const createHref = buildTournamentsHref(activeTab, currentPage, { create: true });
 
   if (!hasAnyVisibleCompetitions) {
@@ -439,6 +540,7 @@ export function TournamentsListSection({
             <nav aria-label="Фильтр турниров" className="flex items-center gap-2">
               <TabLink active={activeTab === "my"} href="/tournaments?tab=my" label="Мои" />
               <TabLink active={activeTab === "all"} href="/tournaments?tab=all" label="Все" />
+              <TabLink active={activeTab === "actions"} href="/tournaments?tab=actions" label="Действия" />
             </nav>
 
             <Link
@@ -462,30 +564,35 @@ export function TournamentsListSection({
             <nav aria-label="Фильтр турниров" className="flex items-center justify-end gap-2">
               <TabLink active={activeTab === "my"} href="/tournaments?tab=my" label="Мои" />
               <TabLink active={activeTab === "all"} href="/tournaments?tab=all" label="Все" />
+              <TabLink active={activeTab === "actions"} href="/tournaments?tab=actions" label="Действия" />
             </nav>
           </div>
         </>
       ) : null}
 
-      {entries.length === 0 ? (
+      {(activeTab === "actions" ? actionEntries.length === 0 : entries.length === 0) ? (
         <ScopedEmptyState activeTab={activeTab} />
       ) : (
         <>
           <section className="space-y-3">
-            {currentEntries.map((entry) => (
-              <TournamentCard
-                key={entry.id}
-                entry={entry}
-              />
-            ))}
+            {activeTab === "actions"
+              ? currentActionEntries.map((entry) => (
+                  <ActionTournamentCard key={entry.id} item={entry} />
+                ))
+              : currentEntries.map((entry) => (
+                  <TournamentCard
+                    key={entry.id}
+                    entry={entry}
+                  />
+                ))}
           </section>
 
           <Pagination
             activeTab={activeTab}
-            currentPage={currentPage}
+            currentPage={activeTab === "actions" ? actionCurrentPage : currentPage}
             pageSize={pageSize}
-            totalItems={entries.length}
-            totalPages={totalPages}
+            totalItems={activeTab === "actions" ? actionEntries.length : entries.length}
+            totalPages={activeTab === "actions" ? actionTotalPages : totalPages}
           />
         </>
       )}

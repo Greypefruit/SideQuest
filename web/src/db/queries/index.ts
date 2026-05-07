@@ -9,3 +9,4 @@ export * from "./player-home";
 export * from "./profiles";
 export * from "./rankings";
 export * from "./shared";
+export * from "./tournament-actions";

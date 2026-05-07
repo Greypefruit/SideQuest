@@ -1,5 +1,5 @@
 import "server-only";
-import { and, asc, desc, eq, or } from "drizzle-orm";
+import { and, asc, desc, eq, inArray, or } from "drizzle-orm";
 import { alias } from "drizzle-orm/pg-core";
 import { type DbExecutor } from "../index";
 import { competitionMatches, competitions, participants, profiles } from "../schema";
@@ -244,6 +244,28 @@ export async function listPendingCompetitionMatches(
     .where(
       and(
         eq(competitionMatches.competitionId, competitionId),
+        eq(competitionMatches.status, "pending"),
+      ),
+    )
+    .orderBy(
+      asc(competitionMatches.roundNumber),
+      asc(competitionMatches.matchNumber),
+      asc(competitionMatches.createdAt),
+    );
+}
+
+export async function listPendingCompetitionMatchesByCompetitionIds(
+  competitionIds: string[],
+  database?: DbExecutor,
+) {
+  if (competitionIds.length === 0) {
+    return [];
+  }
+
+  return buildCompetitionMatchesQuery(database)
+    .where(
+      and(
+        inArray(competitionMatches.competitionId, competitionIds),
         eq(competitionMatches.status, "pending"),
       ),
     )

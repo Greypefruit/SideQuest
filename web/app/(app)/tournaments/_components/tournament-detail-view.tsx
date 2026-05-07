@@ -90,6 +90,7 @@ type TournamentDetailViewProps = {
     status: TournamentStatus;
     title: string;
   };
+  initialTab?: TournamentTab;
   participantOptions: ParticipantOption[];
   participants: TournamentParticipant[];
   permissions: {
@@ -781,6 +782,7 @@ function ResultModal({
 export function TournamentDetailView({
   closeHref,
   competition,
+  initialTab = "overview",
   participantOptions,
   participants,
   permissions,
@@ -789,7 +791,7 @@ export function TournamentDetailView({
   viewerRegistration,
 }: TournamentDetailViewProps) {
   const router = useRouter();
-  const [activeTab, setActiveTab] = useState<TournamentTab>("overview");
+  const [activeTab, setActiveTab] = useState<TournamentTab>(initialTab);
   const [isPending, startTransition] = useTransition();
   const [overviewMessage, setOverviewMessage] = useState<string | null>(null);
   const [participantsMessage, setParticipantsMessage] = useState<string | null>(null);

@@ -7,13 +7,29 @@ type TournamentDetailPageProps = {
   params: Promise<{
     competitionId: string;
   }>;
+  searchParams?: Promise<{
+    tab?: string | string[] | undefined;
+  }>;
 };
+
+function getSingleSearchParam(value: string | string[] | undefined) {
+  if (Array.isArray(value)) {
+    return value[0];
+  }
+
+  return value;
+}
 
 export default async function TournamentDetailPage({
   params,
+  searchParams,
 }: TournamentDetailPageProps) {
   const viewer = await requireCurrentViewer();
   const { competitionId } = await params;
+  const resolvedSearchParams = searchParams ? await searchParams : undefined;
+  const tabParam = getSingleSearchParam(resolvedSearchParams?.tab);
+  const initialTab =
+    tabParam === "participants" || tabParam === "bracket" ? tabParam : "overview";
   const detailData = await getTournamentDetailData(viewer, competitionId);
 
   if (!detailData) {
@@ -42,6 +58,7 @@ export default async function TournamentDetailPage({
           | "cancelled",
         title: detailData.competitionData.competition.title,
       }}
+      initialTab={initialTab}
       participantOptions={detailData.participantOptions}
       participants={detailData.participants}
       permissions={detailData.permissions}

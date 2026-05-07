@@ -8,8 +8,6 @@ const MATCHES_CTA_HREF = "/matches?create=1";
 const TOURNAMENTS_HREF = "/tournaments";
 const SURFACE_CLASS_NAME =
   "rounded-[var(--radius-default)] border border-slate-200/90 bg-white shadow-[0_10px_24px_rgba(15,23,42,0.03)]";
-const SURFACE_SOFT_CLASS_NAME =
-  "rounded-[var(--radius-default)] border border-slate-200/80 bg-white shadow-[0_8px_20px_rgba(15,23,42,0.025)]";
 const MUTED_TEXT_CLASS_NAME = "text-slate-500";
 
 type PlayerHomeDashboardProps = {
@@ -67,25 +65,6 @@ function formatCompactDateTime(value: Date) {
   return `${day}.${month}.${year}`;
 }
 
-function formatParticipantsLabel(count: number) {
-  const normalized = Math.abs(count) % 100;
-  const lastDigit = normalized % 10;
-
-  if (normalized >= 11 && normalized <= 19) {
-    return `${count} участников`;
-  }
-
-  if (lastDigit === 1) {
-    return `${count} участник`;
-  }
-
-  if (lastDigit >= 2 && lastDigit <= 4) {
-    return `${count} участника`;
-  }
-
-  return `${count} участников`;
-}
-
 function ParticipantsIcon() {
   return (
     <svg aria-hidden="true" fill="none" height="16" viewBox="0 0 16 16" width="16">
@@ -137,47 +116,6 @@ function MatchCtaButton({
   );
 }
 
-function formatMatchFormat(value: "BO1" | "BO3" | "BO5") {
-  switch (value) {
-    case "BO1":
-      return "Best of 1";
-    case "BO3":
-      return "Best of 3";
-    case "BO5":
-      return "Best of 5";
-  }
-}
-
-function getBracketRoundLabel(participantsCount: number) {
-  if (participantsCount <= 1) {
-    return null;
-  }
-
-  let bracketSize = 1;
-
-  while (bracketSize < participantsCount) {
-    bracketSize *= 2;
-  }
-
-  if (bracketSize <= 2) {
-    return "Финал";
-  }
-
-  if (bracketSize === 4) {
-    return "1/2 финала";
-  }
-
-  if (bracketSize === 8) {
-    return "1/4 финала";
-  }
-
-  if (bracketSize === 16) {
-    return "1/8 финала";
-  }
-
-  return `1/${bracketSize / 2} финала`;
-}
-
 function SectionTitle({ children }: { children: string }) {
   return (
     <h2 className="text-[0.75rem] font-bold uppercase tracking-[0.09em] text-slate-500">
@@ -220,84 +158,117 @@ function DashboardButton({
   );
 }
 
-function StatCard({
-  label,
-  value,
-  accent = false,
+function TournamentStatusChip({ label }: { label: string }) {
+  return (
+    <span className="inline-flex min-h-6 items-center rounded-[var(--radius-default)] border border-blue-200 bg-blue-50 px-2.5 text-[0.74rem] font-medium text-blue-600">
+      {label}
+    </span>
+  );
+}
+
+function DesktopStatsPanel({
+  elo,
+  losses,
+  matches,
+  place,
+  winRate,
+  wins,
 }: {
-  label: string;
-  value: string;
-  accent?: boolean;
+  elo: string;
+  losses: string;
+  matches: string;
+  place: string;
+  winRate: string;
+  wins: string;
 }) {
   return (
-    <div className={`${SURFACE_SOFT_CLASS_NAME} px-4 py-3.5 text-center`}>
-      <p className="text-[0.63rem] font-semibold uppercase tracking-[0.08em] text-slate-400">
-        {label}
-      </p>
-      <p
-        className={`mt-2.5 text-[1.85rem] font-semibold leading-none tracking-tight ${
-          accent ? "text-blue-600" : "text-slate-950"
-        }`}
-      >
-        {value}
-      </p>
+    <div className={`${SURFACE_CLASS_NAME} overflow-hidden`}>
+      <div className="grid grid-cols-2">
+        <div className="px-4 py-4 text-center">
+          <p className="text-[0.58rem] font-semibold uppercase tracking-[0.08em] text-slate-400">
+            Место
+          </p>
+          <p className="mt-2 text-[1.6rem] font-semibold leading-none tracking-tight text-blue-600">
+            {place}
+          </p>
+        </div>
+        <div className="border-l border-slate-200 px-4 py-4 text-center">
+          <p className="text-[0.58rem] font-semibold uppercase tracking-[0.08em] text-slate-400">
+            Elo
+          </p>
+          <p className="mt-2 text-[1.6rem] font-semibold leading-none tracking-tight text-blue-600">
+            {elo}
+          </p>
+        </div>
+      </div>
+
+      <div className="mx-4 border-t border-slate-200" />
+
+      <div className="grid grid-cols-4">
+        {[
+          { label: "Win rate", value: winRate },
+          { label: "Матчи", value: matches },
+          { label: "Победы", value: wins },
+          { label: "Поражения", value: losses },
+        ].map((entry, index) => (
+          <div
+            key={entry.label}
+            className={`px-3 py-4 text-center ${index > 0 ? "border-l border-slate-200" : ""}`}
+          >
+            <p className="text-[0.58rem] font-semibold uppercase tracking-[0.08em] text-slate-400">
+              {entry.label}
+            </p>
+            <p className="mt-2 text-[1.1rem] font-semibold leading-none tracking-tight text-slate-950">
+              {entry.value}
+            </p>
+          </div>
+        ))}
+      </div>
     </div>
   );
 }
 
-function CompactStat({
-  label,
-  value,
-}: {
-  label: string;
-  value: string;
-}) {
-  return (
-    <div className="flex min-h-[72px] flex-col justify-center border-slate-200 bg-white px-3 py-2.5 text-center [&:not(:last-child)]:border-r">
-      <p className="text-[0.58rem] font-semibold uppercase tracking-[0.08em] text-slate-400">
-        {label}
-      </p>
-      <p className="mt-1.5 text-[1.12rem] font-semibold leading-none tracking-tight text-slate-900">
-        {value}
-      </p>
-    </div>
-  );
-}
-
-function PlayerTournamentCard({
+function TournamentParticipationCard({
   tournament,
+  featured = false,
 }: {
-  tournament: Awaited<ReturnType<typeof getPlayerHomeData>>["tournaments"][number];
+  tournament:
+    | Awaited<ReturnType<typeof getPlayerHomeData>>["nearestTournament"]
+    | Awaited<ReturnType<typeof getPlayerHomeData>>["tournaments"][number];
+  featured?: boolean;
 }) {
+  if (!tournament) {
+    return null;
+  }
+
   return (
     <Link
       href={`/tournaments/${tournament.id}`}
-      className={`group block ${SURFACE_SOFT_CLASS_NAME} px-4 py-4 transition hover:border-blue-200 hover:bg-blue-50 md:px-3 md:py-2.5`}
+      className={`group block rounded-[var(--radius-default)] border px-4 py-4 shadow-[0_10px_24px_rgba(15,23,42,0.03)] transition md:px-5 md:py-4.5 ${
+        featured
+          ? "border-blue-200 bg-[linear-gradient(135deg,rgba(37,99,235,0.14),rgba(255,255,255,0.98)_38%,rgba(191,219,254,0.45)_100%)] hover:border-blue-300 hover:bg-[linear-gradient(135deg,rgba(37,99,235,0.18),rgba(239,246,255,1)_42%,rgba(191,219,254,0.56)_100%)]"
+          : "border-slate-200/90 bg-white hover:border-blue-200 hover:bg-blue-50"
+      }`}
     >
-        <div className="flex items-start justify-between gap-4">
-        <div className="min-w-0">
-          <h3 className="text-[0.98rem] font-semibold leading-5 tracking-tight text-slate-900">
+      <div className="min-w-0">
+        <div className="flex items-start justify-between gap-3">
+          <h3 className="text-[1.02rem] font-semibold leading-5 tracking-tight text-slate-900">
             {tournament.title}
           </h3>
-          <div className={`mt-2 space-y-0.5 text-[0.74rem] ${MUTED_TEXT_CLASS_NAME}`}>
-            <p>{tournament.activityName}</p>
-            <div className="flex flex-wrap items-center gap-x-2 gap-y-1">
-              <span>{formatTournamentDate(tournament.scheduledAt)}</span>
-              <MetaDivider />
-              <span className="inline-flex items-center gap-1.5">
-                <ParticipantsIcon />
-                {tournament.participantsCount}/{tournament.maxParticipants}
-              </span>
-            </div>
-          </div>
+          {featured ? <TournamentStatusChip label={tournament.statusLabel} /> : null}
         </div>
 
-        <span
-          aria-hidden="true"
-          className="shrink-0 self-center text-[0.82rem] text-slate-300 transition group-hover:text-blue-500"
-        >
-          ›
-        </span>
+        <div className={`mt-2 space-y-0.5 text-[0.86rem] leading-5 ${MUTED_TEXT_CLASS_NAME}`}>
+          <p>{tournament.activityName}</p>
+          <div className="flex flex-wrap items-center gap-x-2 gap-y-1">
+            <span>{formatTournamentDate(tournament.scheduledAt)}</span>
+            <MetaDivider />
+            <span className="inline-flex items-center gap-1.5">
+              <ParticipantsIcon />
+              {tournament.participantsCount}/{tournament.maxParticipants}
+            </span>
+          </div>
+        </div>
       </div>
     </Link>
   );
@@ -305,77 +276,50 @@ function PlayerTournamentCard({
 
 export async function PlayerHomeDashboard({ profileId }: PlayerHomeDashboardProps) {
   const data = await getPlayerHomeData(profileId);
+  const participationTournaments = (
+    data.nearestTournament ? [data.nearestTournament, ...data.tournaments] : data.tournaments
+  ).slice(0, 5);
 
   return (
     <div className="mx-auto w-full max-w-[1200px] min-w-0 overflow-x-hidden">
       <div className="space-y-5 pb-20 md:mx-auto md:max-w-[860px] md:pb-0 lg:space-y-4">
         <div className="grid gap-5 lg:grid-cols-[minmax(0,1.34fr)_minmax(290px,0.9fr)] lg:items-start lg:gap-6">
           <section className="space-y-3">
-            <SectionTitle>Ваш ближайший турнир</SectionTitle>
+            <SectionTitle>Участие в турнирах</SectionTitle>
 
-            <div className={`${SURFACE_CLASS_NAME} px-4 py-4 md:px-5 md:py-4.5`}>
-              {data.nearestTournament ? (
-                <div className="flex flex-col gap-4 md:gap-4.5">
-                  <div className="flex flex-col gap-3 md:flex-row md:items-start md:justify-between md:gap-4">
-                    <div className="min-w-0">
-                      <div className="flex flex-wrap gap-2 md:hidden">
-                        <span className="inline-flex min-h-5 items-center rounded-[var(--radius-default)] border border-blue-100 bg-blue-50 px-2 text-[0.54rem] font-semibold tracking-[0.08em] text-blue-700">
-                          {data.nearestTournament.statusLabel}
-                        </span>
-                      </div>
-                      <div className="md:flex md:items-start md:justify-between md:gap-4">
-                        <h3 className="mt-2.5 line-clamp-2 min-w-0 text-[1.35rem] font-semibold leading-tight tracking-tight text-slate-950 md:mt-0 md:flex-1 md:text-[1.3rem] md:line-clamp-none">
-                          {data.nearestTournament.title}
-                        </h3>
-                        <span className="hidden md:mt-0.5 md:inline-flex md:min-h-7 md:shrink-0 md:items-center md:self-start md:rounded-[var(--radius-default)] md:border md:border-blue-100 md:bg-blue-50 md:px-2.5 md:text-[0.64rem] md:font-semibold md:tracking-[0.05em] md:text-blue-700">
-                          {data.nearestTournament.statusLabel.toUpperCase()}
-                        </span>
-                      </div>
-                      <div className={`mt-2.5 space-y-0.5 text-[0.88rem] leading-5 md:text-[0.8rem] md:leading-5 ${MUTED_TEXT_CLASS_NAME}`}>
-                        <p>{data.nearestTournament.activityName}</p>
-                        <div className="flex flex-wrap items-center gap-x-2 gap-y-1">
-                          <span>{formatTournamentDate(data.nearestTournament.scheduledAt)}</span>
-                          <MetaDivider />
-                          <span className="inline-flex items-center gap-1.5">
-                            <ParticipantsIcon />
-                            {data.nearestTournament.participantsCount}/
-                            {data.nearestTournament.maxParticipants}
-                          </span>
-                        </div>
-                      </div>
-                    </div>
-                  </div>
+            {participationTournaments.length > 0 ? (
+              <div className="space-y-3">
+                {participationTournaments.map((tournament, index) => (
+                  <TournamentParticipationCard
+                    key={tournament.id}
+                    featured={index === 0}
+                    tournament={tournament}
+                  />
+                ))}
 
-                  <div>
-                    <Link
-                      className="inline-flex items-center gap-2 text-[0.88rem] font-semibold text-blue-600 transition hover:text-blue-700"
-                      href={`/tournaments/${data.nearestTournament.id}`}
-                    >
-                      <span>Открыть турнир</span>
-                      <span aria-hidden="true">→</span>
-                    </Link>
-                  </div>
+                <div>
+                  <DashboardButton compact href={TOURNAMENTS_HREF}>
+                    Все турниры
+                  </DashboardButton>
                 </div>
-              ) : (
-                <div className="flex h-full flex-col justify-between gap-6">
-                  <div>
-                    <h3 className="text-[1.3rem] font-semibold tracking-tight text-slate-900">
-                      Вы пока не участвуете в турнирах.
-                    </h3>
-                    <p className={`mt-2 max-w-xl text-[0.9rem] leading-6 ${MUTED_TEXT_CLASS_NAME}`}>
-                      Когда вы окажетесь среди участников или зарегистрированных игроков,
-                      ближайший турнир появится здесь.
-                    </p>
-                  </div>
+              </div>
+            ) : (
+              <div className={`${SURFACE_CLASS_NAME} px-5 py-6`}>
+                <h3 className="text-[1.3rem] font-semibold tracking-tight text-slate-900">
+                  Вы пока не участвуете в турнирах.
+                </h3>
+                <p className={`mt-2 max-w-xl text-[0.9rem] leading-6 ${MUTED_TEXT_CLASS_NAME}`}>
+                  Когда вы окажетесь среди участников или зарегистрированных игроков,
+                  турниры появятся здесь.
+                </p>
 
-                  <div>
-                    <DashboardButton fullWidth href={TOURNAMENTS_HREF}>
-                      Перейти к турнирам
-                    </DashboardButton>
-                  </div>
+                <div className="mt-5">
+                  <DashboardButton fullWidth href={TOURNAMENTS_HREF}>
+                    Перейти к турнирам
+                  </DashboardButton>
                 </div>
-              )}
-            </div>
+              </div>
+            )}
           </section>
 
           <section className="space-y-3">
@@ -395,64 +339,23 @@ export async function PlayerHomeDashboard({ profileId }: PlayerHomeDashboardProp
             </div>
 
             <div className="hidden space-y-2.5 md:block">
-              <div className="grid grid-cols-2 gap-2.5">
-                <StatCard accent label="Место" value={data.stats.place ? `#${data.stats.place}` : "—"} />
-                <StatCard accent label="ELO" value={data.stats.elo !== null ? String(data.stats.elo) : "—"} />
-              </div>
-
-              <div className={`${SURFACE_SOFT_CLASS_NAME} overflow-hidden`}>
-                <div className="grid grid-cols-2 sm:grid-cols-4">
-                  <CompactStat label="Win rate" value={`${data.stats.winRate}%`} />
-                  <CompactStat label="Матчи" value={String(data.stats.matches)} />
-                  <CompactStat label="Победы" value={String(data.stats.wins)} />
-                  <CompactStat label="Поражения" value={String(data.stats.losses)} />
-                </div>
-              </div>
+              <DesktopStatsPanel
+                elo={data.stats.elo !== null ? String(data.stats.elo) : "—"}
+                losses={String(data.stats.losses)}
+                matches={String(data.stats.matches)}
+                place={data.stats.place ? `#${data.stats.place}` : "—"}
+                winRate={`${data.stats.winRate}%`}
+                wins={String(data.stats.wins)}
+              />
 
               <div className="pt-1.5">
                 <MatchCtaButton className="w-full" />
               </div>
             </div>
-          </section>
-        </div>
 
-        <div className="grid gap-5 pt-2 md:pt-3 lg:grid-cols-[minmax(0,1.34fr)_minmax(290px,0.9fr)] lg:items-start lg:gap-6">
-          <section className="order-2 hidden space-y-3 md:block lg:order-1">
-            <SectionTitle>Ваши турниры</SectionTitle>
-
-            {data.tournaments.length > 0 ? (
-              <div className="space-y-2.5">
-                <div className="grid gap-3 md:grid-cols-2 md:gap-2.5">
-                  {data.tournaments.map((tournament) => (
-                    <PlayerTournamentCard key={tournament.id} tournament={tournament} />
-                  ))}
-                </div>
-
-                <div>
-                  <DashboardButton compact href={TOURNAMENTS_HREF}>
-                    Все турниры
-                  </DashboardButton>
-                </div>
-              </div>
-            ) : (
-              <div className={`${SURFACE_CLASS_NAME} px-5 py-6`}>
-                <h3 className="text-[1.05rem] font-semibold tracking-tight text-slate-900">
-                  Вы пока не участвуете в турнирах
-                </h3>
-                <p className={`mt-2 text-[0.9rem] leading-6 ${MUTED_TEXT_CLASS_NAME}`}>
-                  Откройте список турниров, чтобы посмотреть доступные соревнования.
-                </p>
-                <div className="mt-5">
-                  <DashboardButton fullWidth href={TOURNAMENTS_HREF}>
-                    Все турниры
-                  </DashboardButton>
-                </div>
-              </div>
-            )}
-          </section>
-
-          <section className="order-1 space-y-3 lg:order-2">
-            <SectionTitle>Изменения рейтинга</SectionTitle>
+            <div className="pt-2 md:pt-3">
+              <SectionTitle>Изменения рейтинга</SectionTitle>
+            </div>
 
             <div className={`${SURFACE_CLASS_NAME} overflow-hidden`}>
               {data.ratingChanges.length > 0 ? (
