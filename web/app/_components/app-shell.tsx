@@ -93,8 +93,11 @@ function getPageTitle(pathname: string, viewport: "mobile" | "desktop") {
 export function AppShell({ viewer, children }: AppShellProps) {
   const pathname = usePathname();
   const isTournamentDetailPage = /^\/tournaments\/[^/]+$/.test(pathname);
+  const desktopPrimaryNavItems = primaryNavItems.filter((item) => item.href !== "/");
   const desktopNavItems =
-    viewer.role === "admin" ? [...primaryNavItems, adminNavItem] : primaryNavItems;
+    viewer.role === "admin"
+      ? [...desktopPrimaryNavItems, adminNavItem]
+      : desktopPrimaryNavItems;
   const mobileAdminAction =
     viewer.role === "admin" && !isActivePath(pathname, adminNavItem.href) ? adminNavItem : null;
 
