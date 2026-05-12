@@ -14,6 +14,26 @@ type PlayerHomeDashboardProps = {
   profileId: string;
 };
 
+function getMatchesHighlightHref(matchType: "normal" | "tournament", matchId: string) {
+  const params = new URLSearchParams({
+    highlightMatchId: matchId,
+    type: matchType,
+  });
+
+  return `/matches?${params.toString()}`;
+}
+
+function getRatingChangeHref(entry: {
+  matchId?: string;
+  matchType?: "normal" | "tournament";
+}) {
+  if (!entry.matchId || !entry.matchType) {
+    return undefined;
+  }
+
+  return getMatchesHighlightHref(entry.matchType, entry.matchId);
+}
+
 function formatTournamentDate(value: Date | null) {
   if (!value) {
     return "Дата уточняется";
@@ -112,6 +132,18 @@ function MatchCtaButton({
     >
       <PlusIcon />
       Записать матч
+    </Link>
+  );
+}
+
+function MatchFabButton() {
+  return (
+    <Link
+      aria-label="Записать матч"
+      href={MATCHES_CTA_HREF}
+      className="fixed bottom-[calc(env(safe-area-inset-bottom)+6rem)] right-4 z-30 inline-flex h-14 w-14 items-center justify-center rounded-full border border-blue-500 bg-blue-600 text-white shadow-[0_14px_30px_rgba(37,99,235,0.28)] transition hover:bg-blue-700 focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-blue-200 md:hidden"
+    >
+      <PlusIcon />
     </Link>
   );
 }
@@ -334,10 +366,6 @@ export async function PlayerHomeDashboard({ profileId }: PlayerHomeDashboardProp
               wins={String(data.stats.wins)}
             />
 
-            <div className="md:hidden">
-              <MatchCtaButton fullWidth />
-            </div>
-
             <div className="hidden space-y-2.5 md:block">
               <DesktopStatsPanel
                 elo={data.stats.elo !== null ? String(data.stats.elo) : "—"}
@@ -362,6 +390,7 @@ export async function PlayerHomeDashboard({ profileId }: PlayerHomeDashboardProp
                 <PlayerRatingChangesList
                   items={data.ratingChanges.map((entry) => ({
                     delta: entry.delta,
+                    href: getRatingChangeHref(entry),
                     id: entry.id,
                     opponentName: entry.opponentName,
                     subtitle: formatCompactDateTime(entry.occurredAt),
@@ -381,6 +410,8 @@ export async function PlayerHomeDashboard({ profileId }: PlayerHomeDashboardProp
           </section>
         </div>
       </div>
+
+      <MatchFabButton />
     </div>
   );
 }

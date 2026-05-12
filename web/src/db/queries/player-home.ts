@@ -38,6 +38,8 @@ type PlayerHomeRatingChange = {
   createdAt: Date;
   delta: number;
   id: string;
+  matchId?: string;
+  matchType?: "normal" | "tournament";
   occurredAt: Date;
   opponentName: string;
   sourceLabel: string;
@@ -354,6 +356,9 @@ function buildCombinedRatingHistory(
       createdAt: event.createdAt,
       delta: viewerAfterRating - viewerBeforeRating,
       id: event.id,
+      matchId:
+        event.kind === "competition" ? event.id : event.id.replace(/^match:/, ""),
+      matchType: event.kind === "competition" ? "tournament" : "normal",
       occurredAt: event.eventAt,
       opponentName: viewerIsPlayer1 ? event.opponent2Name : event.opponent1Name,
       sourceLabel:
