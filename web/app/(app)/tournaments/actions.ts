@@ -143,6 +143,28 @@ function parseOptionalScheduledAt(rawDate: string, rawTime: string) {
   return { ok: true as const, value: scheduledAt };
 }
 
+function parseRequiredScheduledAt(rawDate: string, rawHour: string, rawMinute: string) {
+  const dateValue = rawDate.trim();
+  const hourValue = rawHour.trim();
+  const minuteValue = rawMinute.trim();
+
+  if (!dateValue) {
+    return {
+      ok: false as const,
+      message: "Укажите дату проведения.",
+    };
+  }
+
+  if (!hourValue || !minuteValue) {
+    return {
+      ok: false as const,
+      message: "Укажите время проведения.",
+    };
+  }
+
+  return parseOptionalScheduledAt(dateValue, `${hourValue}:${minuteValue}`);
+}
+
 function buildTournamentActionError(message: string) {
   return { message, ok: false as const };
 }
@@ -485,7 +507,8 @@ export async function createTournamentAction(
   const location = String(formData.get("location") ?? "").trim();
   const maxParticipantsValue = String(formData.get("maxParticipants") ?? "").trim();
   const rawDate = String(formData.get("scheduledDate") ?? "");
-  const rawTime = String(formData.get("scheduledTime") ?? "");
+  const rawHour = String(formData.get("scheduledHour") ?? "");
+  const rawMinute = String(formData.get("scheduledMinute") ?? "");
 
   if (!title) {
     return { error: "Введите название турнира." };
@@ -509,7 +532,7 @@ export async function createTournamentAction(
     return { error: parsedMaxParticipants.message };
   }
 
-  const parsedScheduledAt = parseOptionalScheduledAt(rawDate, rawTime);
+  const parsedScheduledAt = parseRequiredScheduledAt(rawDate, rawHour, rawMinute);
 
   if (!parsedScheduledAt.ok) {
     return { error: parsedScheduledAt.message };

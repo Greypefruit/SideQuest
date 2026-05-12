@@ -17,6 +17,9 @@ const INITIAL_FORM_STATE = {
   error: null as string | null,
 };
 
+const HOUR_OPTIONS = Array.from({ length: 24 }, (_, index) => String(index).padStart(2, "0"));
+const MINUTE_OPTIONS = ["00", "15", "30", "45"] as const;
+
 function getTodayDateInputValue() {
   const now = new Date();
   const year = String(now.getFullYear());
@@ -65,6 +68,10 @@ function SubmitButton() {
       {pending ? "Создаем турнир..." : "Создать турнир"}
     </button>
   );
+}
+
+function RequiredMark() {
+  return <span className="text-red-500">*</span>;
 }
 
 export function CreateTournamentSheet({
@@ -148,7 +155,7 @@ export function CreateTournamentSheet({
                 htmlFor="title"
                 className="block text-[0.68rem] font-semibold uppercase tracking-[0.08em] text-slate-500"
               >
-                Название турнира
+                Название турнира <RequiredMark />
               </label>
               <input
                 id="title"
@@ -186,6 +193,7 @@ export function CreateTournamentSheet({
             <fieldset className="space-y-2">
               <legend className="flex items-center gap-1.5 text-[0.68rem] font-semibold uppercase tracking-[0.08em] text-slate-500">
                 <span>Формат матчей</span>
+                <RequiredMark />
                 <MatchFormatTooltipWithAlign align="left" />
               </legend>
               <div className="grid grid-cols-3 gap-2">
@@ -212,31 +220,56 @@ export function CreateTournamentSheet({
                   htmlFor="scheduledDate"
                   className="block text-[0.68rem] font-semibold uppercase tracking-[0.08em] text-slate-500"
                 >
-                  Дата
+                  Дата <RequiredMark />
                 </label>
                 <input
                   id="scheduledDate"
                   name="scheduledDate"
                   min={minScheduledDate}
+                  required
                   type="date"
                   className="min-h-11 w-full rounded-[var(--radius-default)] border border-slate-200 px-3.5 text-[0.95rem] text-slate-900 outline-none transition focus:border-blue-400 focus:ring-2 focus:ring-blue-100 md:min-h-10 md:text-[0.92rem]"
                 />
               </div>
 
               <div className="space-y-2">
-                <label
-                  htmlFor="scheduledTime"
-                  className="block text-[0.68rem] font-semibold uppercase tracking-[0.08em] text-slate-500"
-                >
-                  Время
-                </label>
-                <input
-                  id="scheduledTime"
-                  name="scheduledTime"
-                  step={60}
-                  type="time"
-                  className="min-h-11 w-full rounded-[var(--radius-default)] border border-slate-200 px-3.5 text-[0.95rem] text-slate-900 outline-none transition focus:border-blue-400 focus:ring-2 focus:ring-blue-100 md:min-h-10 md:text-[0.92rem]"
-                />
+                <p className="block text-[0.68rem] font-semibold uppercase tracking-[0.08em] text-slate-500">
+                  Время <RequiredMark />
+                </p>
+                <div className="grid grid-cols-2 gap-2">
+                  <select
+                    aria-label="Часы проведения"
+                    className="min-h-11 w-full appearance-none rounded-[var(--radius-default)] border border-slate-200 bg-[linear-gradient(45deg,transparent_50%,#64748b_50%),linear-gradient(135deg,#64748b_50%,transparent_50%)] bg-[position:calc(100%-18px)_50%,calc(100%-12px)_50%] bg-[size:6px_6px,6px_6px] bg-no-repeat bg-white px-3 pr-8 text-[0.95rem] text-slate-900 outline-none transition focus:border-blue-400 focus:ring-2 focus:ring-blue-100 md:min-h-10 md:text-[0.92rem]"
+                    defaultValue=""
+                    name="scheduledHour"
+                    required
+                  >
+                    <option value="" disabled>
+                      Часы
+                    </option>
+                    {HOUR_OPTIONS.map((hour) => (
+                      <option key={hour} value={hour}>
+                        {hour}
+                      </option>
+                    ))}
+                  </select>
+                  <select
+                    aria-label="Минуты проведения"
+                    className="min-h-11 w-full appearance-none rounded-[var(--radius-default)] border border-slate-200 bg-[linear-gradient(45deg,transparent_50%,#64748b_50%),linear-gradient(135deg,#64748b_50%,transparent_50%)] bg-[position:calc(100%-18px)_50%,calc(100%-12px)_50%] bg-[size:6px_6px,6px_6px] bg-no-repeat bg-white px-3 pr-8 text-[0.95rem] text-slate-900 outline-none transition focus:border-blue-400 focus:ring-2 focus:ring-blue-100 md:min-h-10 md:text-[0.92rem]"
+                    defaultValue=""
+                    name="scheduledMinute"
+                    required
+                  >
+                    <option value="" disabled>
+                      Минуты
+                    </option>
+                    {MINUTE_OPTIONS.map((minute) => (
+                      <option key={minute} value={minute}>
+                        {minute}
+                      </option>
+                    ))}
+                  </select>
+                </div>
               </div>
             </div>
 
@@ -245,14 +278,15 @@ export function CreateTournamentSheet({
                 htmlFor="maxParticipants"
                 className="block text-[0.68rem] font-semibold uppercase tracking-[0.08em] text-slate-500"
               >
-                Лимит участников
+                Лимит участников <RequiredMark />
               </label>
               <input
                 id="maxParticipants"
                 name="maxParticipants"
                 type="number"
                 min={2}
-                defaultValue={16}
+                defaultValue={8}
+                required
                 className="min-h-11 w-full rounded-[var(--radius-default)] border border-slate-200 px-3.5 text-[0.95rem] text-slate-900 outline-none transition focus:border-blue-400 focus:ring-2 focus:ring-blue-100 md:min-h-10 md:text-[0.92rem]"
               />
             </div>
