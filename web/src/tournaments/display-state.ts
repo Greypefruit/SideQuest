@@ -66,6 +66,13 @@ export function getTournamentDisplayStatus(
     };
   }
 
+  if (runtimeState.status === "ready" && !runtimeState.hasBracket) {
+    return {
+      label: "Ждет сетку",
+      tone: "amber",
+    };
+  }
+
   return {
     label: "Ожидает начала",
     tone: "amber",

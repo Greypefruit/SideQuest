@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import type { TournamentActionItem } from "@/src/db/queries/tournament-actions";
 import {
   getTournamentListBadge,
@@ -47,6 +47,24 @@ function PlusIcon() {
       />
     </svg>
   );
+}
+
+function useIsDesktop() {
+  const [isDesktop, setIsDesktop] = useState(false);
+
+  useEffect(() => {
+    const mediaQuery = window.matchMedia("(min-width: 768px)");
+    const syncValue = () => setIsDesktop(mediaQuery.matches);
+
+    syncValue();
+    mediaQuery.addEventListener("change", syncValue);
+
+    return () => {
+      mediaQuery.removeEventListener("change", syncValue);
+    };
+  }, []);
+
+  return isDesktop;
 }
 
 function ChevronDownIcon({ expanded }: { expanded: boolean }) {
@@ -324,7 +342,7 @@ function TabLink({
   return (
     <Link
       href={href}
-      className={`inline-flex min-h-11 items-center justify-center rounded-[var(--radius-default)] px-5 text-[0.92rem] font-semibold transition md:min-h-10 md:px-[1.05rem] md:text-[0.86rem] ${
+      className={`inline-flex min-h-9 shrink-0 items-center justify-center whitespace-nowrap rounded-[var(--radius-default)] px-3 text-[0.8rem] font-semibold transition md:min-h-10 md:px-[1.05rem] md:text-[0.86rem] ${
         active ? "bg-blue-500 text-white" : "bg-slate-100 text-slate-600 hover:bg-slate-200"
       }`}
     >
@@ -335,8 +353,10 @@ function TabLink({
 
 function ManagementSection({ entries }: { entries: TournamentActionItem[] }) {
   const [isExpanded, setIsExpanded] = useState(false);
-  const visibleEntries = isExpanded ? entries : entries.slice(0, 3);
-  const hiddenCount = Math.max(0, entries.length - 3);
+  const isDesktop = useIsDesktop();
+  const collapsedCount = isDesktop ? 3 : 2;
+  const visibleEntries = isExpanded ? entries : entries.slice(0, collapsedCount);
+  const hiddenCount = Math.max(0, entries.length - collapsedCount);
 
   return (
     <section className="space-y-3 rounded-[var(--radius-default)] border border-slate-200/90 bg-white p-3.5 shadow-[0_10px_24px_rgba(15,23,42,0.03)] md:p-4">
@@ -490,16 +510,18 @@ function PaginatedTournamentSection({
   pageSize: number;
   title: string;
 }) {
+  const isDesktop = useIsDesktop();
   const [currentPage, setCurrentPage] = useState(1);
+  const effectivePageSize = isDesktop ? pageSize : 4;
 
   if (entries.length === 0) {
     return null;
   }
 
-  const totalPages = Math.max(1, Math.ceil(entries.length / pageSize));
+  const totalPages = Math.max(1, Math.ceil(entries.length / effectivePageSize));
   const safePage = Math.min(currentPage, totalPages);
-  const pageStart = (safePage - 1) * pageSize;
-  const visibleEntries = entries.slice(pageStart, pageStart + pageSize);
+  const pageStart = (safePage - 1) * effectivePageSize;
+  const visibleEntries = entries.slice(pageStart, pageStart + effectivePageSize);
 
   return (
     <section className="space-y-3">
@@ -556,7 +578,10 @@ export function TournamentsListSection({
       <div className="flex flex-col gap-3">
         {isManager ? (
           <div className="flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
-            <nav aria-label="Фильтр турниров" className="flex flex-wrap items-center gap-2">
+            <nav
+              aria-label="Фильтр турниров"
+              className="-mx-4 flex items-center gap-2 overflow-x-auto px-4 pb-1 md:mx-0 md:flex-wrap md:overflow-visible md:px-0 md:pb-0"
+            >
               <TabLink
                 active={activeTab === "my"}
                 href={buildTournamentsHref("my")}
@@ -577,14 +602,18 @@ export function TournamentsListSection({
 
             <Link
               href={createHref}
-              className="inline-flex min-h-11 items-center justify-center gap-2 rounded-[var(--radius-default)] border border-blue-500 bg-blue-500 px-4 text-[0.92rem] font-semibold text-white transition hover:bg-blue-600 md:min-h-10 md:text-[0.86rem]"
+              aria-label="Создать турнир"
+              className="fixed bottom-[calc(env(safe-area-inset-bottom)+6rem)] right-4 z-30 inline-flex h-14 w-14 items-center justify-center rounded-full border border-blue-500 bg-blue-600 text-white shadow-[0_14px_30px_rgba(37,99,235,0.28)] transition hover:bg-blue-700 focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-blue-200 md:static md:h-auto md:w-auto md:min-h-10 md:gap-2 md:rounded-[var(--radius-default)] md:border-blue-500 md:bg-blue-500 md:px-[1.05rem] md:text-[0.86rem] md:font-semibold md:shadow-none md:hover:bg-blue-600"
             >
               <PlusIcon />
-              Создать турнир
+              <span className="hidden md:inline">Создать турнир</span>
             </Link>
           </div>
         ) : (
-          <nav aria-label="Фильтр турниров" className="flex flex-wrap items-center gap-2">
+          <nav
+            aria-label="Фильтр турниров"
+            className="-mx-4 flex items-center gap-2 overflow-x-auto px-4 pb-1 md:mx-0 md:flex-wrap md:overflow-visible md:px-0 md:pb-0"
+          >
             <TabLink
               active={activeTab === "participating"}
               href={buildTournamentsHref("participating")}

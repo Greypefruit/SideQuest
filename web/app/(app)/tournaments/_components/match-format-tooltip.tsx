@@ -41,8 +41,8 @@ export function MatchFormatTooltipWithAlign({
 
       <span
         role="tooltip"
-        className={`pointer-events-none absolute top-full z-30 mt-2 hidden w-[min(18rem,calc(100vw-2rem))] rounded-[8px] border border-slate-200 bg-white px-3 py-2 text-left text-[0.74rem] font-normal normal-case tracking-normal leading-5 text-slate-600 shadow-[0_14px_32px_rgba(15,23,42,0.12)] group-hover/tooltip:block group-focus-within/tooltip:block ${
-          align === "left" ? "left-0" : "right-0"
+        className={`pointer-events-none absolute top-full z-30 mt-2 hidden w-[min(18rem,calc(100vw-2rem))] -translate-x-1/2 rounded-[8px] border border-slate-200 bg-white px-3 py-2 text-left text-[0.74rem] font-normal normal-case tracking-normal leading-5 text-slate-600 shadow-[0_14px_32px_rgba(15,23,42,0.12)] group-hover/tooltip:block group-focus-within/tooltip:block left-1/2 md:translate-x-0 ${
+          align === "left" ? "md:left-0" : "md:right-0 md:left-auto"
         }`}
       >
         <span className="whitespace-pre-line">{MATCH_FORMAT_HINT}</span>

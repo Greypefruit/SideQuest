@@ -289,6 +289,7 @@ export const competitionParticipants = pgTable(
     addedByProfileId: uuid("added_by_profile_id")
       .notNull()
       .references(() => profiles.id),
+    ratingAtSeeding: integer("rating_at_seeding"),
     createdAt: timestamp("created_at").defaultNow().notNull(),
   },
   (table) => [

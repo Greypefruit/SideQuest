@@ -34,21 +34,6 @@ function buildSeedOrder(bracketSize: number) {
   return seedOrder;
 }
 
-function buildProjectedSeedMap(
-  participants: Awaited<ReturnType<typeof getCompetitionParticipants>>,
-) {
-  const sortedParticipants = [...participants].sort((left, right) => {
-    const leftRating = left.ranking?.rating ?? 1000;
-    const rightRating = right.ranking?.rating ?? 1000;
-
-    return rightRating - leftRating;
-  });
-
-  return new Map(
-    sortedParticipants.map((entry, index) => [entry.participant.id, index + 1] as const),
-  );
-}
-
 function buildGeneratedSeedMap(
   participants: Awaited<ReturnType<typeof getCompetitionParticipants>>,
   bracket: Awaited<ReturnType<typeof getCompetitionBracket>>,
@@ -137,7 +122,7 @@ export async function getTournamentDetailData(
     status: competitionData.competition.status as TournamentStatus,
   });
 
-  const seedMap = buildGeneratedSeedMap(participants, bracket) ?? buildProjectedSeedMap(participants);
+  const seedMap = buildGeneratedSeedMap(participants, bracket);
   const existingParticipantIds = new Set(participants.map((entry) => entry.participant.id));
   const viewerParticipantId = viewerParticipant?.id ?? null;
   const isViewerRegistered =
@@ -146,10 +131,11 @@ export async function getTournamentDetailData(
   const seededParticipants = participants
     .map((entry, index) => ({
       competitionParticipantId: entry.competitionParticipant.id,
+      currentRating: entry.ranking?.rating ?? null,
       displayName: entry.profile.displayName,
       participantId: entry.participant.id,
-      rating: entry.ranking?.rating ?? null,
-      seed: seedMap.get(entry.participant.id) ?? null,
+      ratingAtSeeding: entry.competitionParticipant.ratingAtSeeding ?? null,
+      seed: seedMap?.get(entry.participant.id) ?? null,
       originalIndex: index,
     }))
     .sort((left, right) => {
@@ -170,12 +156,15 @@ export async function getTournamentDetailData(
     .map((participant) => ({
       competitionParticipantId: participant.competitionParticipantId,
       displayName: participant.displayName,
+      isOrganizer: participants[participant.originalIndex]?.profile.id === competitionData.owner.id,
+      isViewer: participant.participantId === viewerParticipantId,
       losses:
         participants[participant.originalIndex]?.ranking?.losses ?? 0,
       matchesPlayed:
         participants[participant.originalIndex]?.ranking?.matchesPlayed ?? 0,
       participantId: participant.participantId,
-      rating: participant.rating,
+      currentRating: participant.currentRating,
+      ratingAtSeeding: participant.ratingAtSeeding,
       seed: participant.seed,
       wins:
         participants[participant.originalIndex]?.ranking?.wins ?? 0,
@@ -206,13 +195,13 @@ export async function getTournamentDetailData(
           slot1: {
             displayName: match.slot1Profile?.displayName ?? null,
             participantId: slot1ParticipantId,
-            seed: slot1ParticipantId ? seedMap.get(slot1ParticipantId) ?? null : null,
+            seed: slot1ParticipantId ? seedMap?.get(slot1ParticipantId) ?? null : null,
           },
           slot1Score: match.competitionMatch.slot1Score,
           slot2: {
             displayName: match.slot2Profile?.displayName ?? null,
             participantId: slot2ParticipantId,
-            seed: slot2ParticipantId ? seedMap.get(slot2ParticipantId) ?? null : null,
+            seed: slot2ParticipantId ? seedMap?.get(slot2ParticipantId) ?? null : null,
           },
           slot2Score: match.competitionMatch.slot2Score,
           status: match.competitionMatch.status,
@@ -242,7 +231,11 @@ export async function getTournamentDetailData(
       canDeleteTournament:
         canManageCompetition && competitionData.competition.status === "draft",
       canEditDraft:
-        canManageCompetition && competitionData.competition.status === "draft",
+        canManageCompetition &&
+        !runtimeState.hasBracket &&
+        (competitionData.competition.status === "draft" ||
+          competitionData.competition.status === "registration" ||
+          competitionData.competition.status === "ready"),
       canGenerateBracket: canManageCompetition && runtimeState.canGenerateBracket,
       canManageParticipantAdd:
         canManageCompetition &&

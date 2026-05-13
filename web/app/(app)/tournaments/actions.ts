@@ -229,6 +229,29 @@ function getDefaultRankingValues(participantId: string) {
   };
 }
 
+async function getManageableEditableCompetition(
+  viewer: Awaited<ReturnType<typeof requireCurrentViewer>>,
+  competitionId: string,
+  database: typeof db | Parameters<Parameters<typeof db.transaction>[0]>[0],
+) {
+  const competitionResult = await getManageableCompetition(viewer, competitionId, database);
+
+  if (!competitionResult.ok) {
+    return competitionResult;
+  }
+
+  if (
+    competitionResult.runtimeState.hasBracket ||
+    !["draft", "registration", "ready"].includes(competitionResult.runtimeState.status)
+  ) {
+    return buildTournamentActionError(
+      "Редактирование доступно только до генерации сетки.",
+    );
+  }
+
+  return competitionResult;
+}
+
 async function getManageableDraftCompetition(
   viewer: Awaited<ReturnType<typeof requireCurrentViewer>>,
   competitionId: string,
@@ -242,7 +265,7 @@ async function getManageableDraftCompetition(
 
   if (competitionResult.runtimeState.status !== "draft") {
     return buildTournamentActionError(
-      "Редактирование доступно только для турнира в статусе «черновик».",
+      "Удаление доступно только для турнира в статусе «черновик».",
     );
   }
 
@@ -335,8 +358,9 @@ type GeneratedBracketMatch = {
 };
 
 type SeededParticipant = {
+  competitionParticipantId: string;
   participantId: string;
-  rating: number;
+  ratingAtSeeding: number;
 };
 
 function getBracketSize(participantCount: number) {
@@ -377,14 +401,14 @@ function rankParticipantsForBracket(participants: SeededParticipant[]) {
   const participantsByRating = new Map<number, SeededParticipant[]>();
 
   for (const participant of participants) {
-    const ratingGroup = participantsByRating.get(participant.rating);
+    const ratingGroup = participantsByRating.get(participant.ratingAtSeeding);
 
     if (ratingGroup) {
       ratingGroup.push(participant);
       continue;
     }
 
-    participantsByRating.set(participant.rating, [participant]);
+    participantsByRating.set(participant.ratingAtSeeding, [participant]);
   }
 
   const sortedRatings = [...participantsByRating.keys()].sort((left, right) => right - left);
@@ -398,21 +422,46 @@ function rankParticipantsForBracket(participants: SeededParticipant[]) {
   return rankedParticipants;
 }
 
-function buildSeedSlots(participants: SeededParticipant[]) {
-  const bracketSize = getBracketSize(participants.length);
+function createSeedAssignments(participants: SeededParticipant[]) {
+  const rankedParticipants = rankParticipantsForBracket(participants);
+
+  return rankedParticipants.map((participant, index) => ({
+    competitionParticipantId: participant.competitionParticipantId,
+    participantId: participant.participantId,
+    ratingAtSeeding: participant.ratingAtSeeding,
+    seed: index + 1,
+  }));
+}
+
+function buildSeedSlots(
+  assignments: Array<{
+    competitionParticipantId: string;
+    participantId: string;
+    ratingAtSeeding: number;
+    seed: number;
+  }>,
+) {
+  const bracketSize = getBracketSize(assignments.length);
   const seedOrder = buildSeedOrder(bracketSize);
-  const seededParticipants = rankParticipantsForBracket(participants);
   const participantsBySeed = new Map<number, string>();
 
-  for (let index = 0; index < seededParticipants.length; index += 1) {
-    participantsBySeed.set(index + 1, seededParticipants[index].participantId);
+  for (const assignment of assignments) {
+    participantsBySeed.set(assignment.seed, assignment.participantId);
   }
 
   return seedOrder.map((seed) => participantsBySeed.get(seed) ?? null);
 }
 
-function buildBracketMatches(competitionId: string, participants: SeededParticipant[]) {
-  const firstRoundSlots = buildSeedSlots(participants);
+function buildBracketMatches(
+  competitionId: string,
+  assignments: Array<{
+    competitionParticipantId: string;
+    participantId: string;
+    ratingAtSeeding: number;
+    seed: number;
+  }>,
+) {
+  const firstRoundSlots = buildSeedSlots(assignments);
   const allRounds: GeneratedBracketMatch[][] = [];
   const firstRoundMatches: GeneratedBracketMatch[] = [];
 
@@ -573,7 +622,7 @@ export async function updateTournamentDraftAction(input: {
 }) {
   const viewer = await requireCurrentViewer();
   const result = await db.transaction(async (tx) => {
-    const competitionResult = await getManageableDraftCompetition(
+    const competitionResult = await getManageableEditableCompetition(
       viewer,
       input.competitionId,
       tx,
@@ -605,6 +654,14 @@ export async function updateTournamentDraftAction(input: {
 
     if (!parsedMaxParticipants.ok) {
       return buildTournamentActionError(parsedMaxParticipants.message);
+    }
+
+    const participants = await getCompetitionParticipants(input.competitionId, tx);
+
+    if (parsedMaxParticipants.value < participants.length) {
+      return buildTournamentActionError(
+        `Лимит участников не может быть меньше уже добавленных игроков: ${participants.length}.`,
+      );
     }
 
     const parsedScheduledAt = parseOptionalScheduledAt(
@@ -779,10 +836,21 @@ export async function generateTournamentBracketAction(input: { competitionId: st
     }
 
     const seededParticipants = participants.map((entry) => ({
+      competitionParticipantId: entry.competitionParticipant.id,
       participantId: entry.participant.id,
-      rating: entry.ranking?.rating ?? 1000,
+      ratingAtSeeding: entry.ranking?.rating ?? DEFAULT_ELO_RATING,
     }));
-    const bracketMatches = buildBracketMatches(input.competitionId, seededParticipants);
+    const seedAssignments = createSeedAssignments(seededParticipants);
+    const bracketMatches = buildBracketMatches(input.competitionId, seedAssignments);
+
+    for (const assignment of seedAssignments) {
+      await tx
+        .update(schema.competitionParticipants)
+        .set({
+          ratingAtSeeding: assignment.ratingAtSeeding,
+        })
+        .where(eq(schema.competitionParticipants.id, assignment.competitionParticipantId));
+    }
 
     await tx.insert(schema.competitionMatches).values(bracketMatches);
 

@@ -7,7 +7,10 @@ import {
   listCompetitionsVisibleToOrganizerAll,
   listProfileCompetitions,
 } from "@/src/db/queries";
-import { resolveTournamentRuntimeState } from "@/src/tournaments/runtime-state";
+import {
+  resolveTournamentRuntimeState,
+  type TournamentStatus,
+} from "@/src/tournaments/runtime-state";
 import { CreateTournamentSheet } from "./_components/create-tournament-sheet";
 import { TournamentsListSection } from "./_components/tournaments-list-section";
 

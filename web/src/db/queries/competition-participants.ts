@@ -33,6 +33,7 @@ export async function getCompetitionParticipants(
         competitionId: competitionParticipants.competitionId,
         participantId: competitionParticipants.participantId,
         addedByProfileId: competitionParticipants.addedByProfileId,
+        ratingAtSeeding: competitionParticipants.ratingAtSeeding,
         createdAt: competitionParticipants.createdAt,
       },
       participant: participantColumns,
