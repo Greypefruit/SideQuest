@@ -59,20 +59,25 @@ function getWinRate(wins: number, matchesPlayed: number) {
   return `${Math.round((wins / matchesPlayed) * 100)}%`;
 }
 
-type StatItemProps = {
-  label: string;
-  value: string;
-};
+function getRussianCountLabel(value: number, one: string, few: string, many: string) {
+  const absoluteValue = Math.abs(value);
+  const lastTwoDigits = absoluteValue % 100;
 
-function StatItem({ label, value }: StatItemProps) {
-  return (
-    <div className="space-y-0.5 text-center">
-      <p className="text-[0.92rem] font-semibold leading-none text-slate-800">{value}</p>
-      <p className="text-[0.64rem] font-semibold uppercase tracking-[0.1em] text-slate-400">
-        {label}
-      </p>
-    </div>
-  );
+  if (lastTwoDigits >= 11 && lastTwoDigits <= 14) {
+    return many;
+  }
+
+  const lastDigit = absoluteValue % 10;
+
+  if (lastDigit === 1) {
+    return one;
+  }
+
+  if (lastDigit >= 2 && lastDigit <= 4) {
+    return few;
+  }
+
+  return many;
 }
 
 type PaginationControlsProps = {
@@ -202,27 +207,31 @@ export default async function RankingPage({ searchParams }: RankingPageProps) {
             ) : (
               <>
                 <section className="rounded-[var(--radius-default)] border border-slate-200/90 bg-white shadow-[0_12px_28px_rgba(15,23,42,0.035)] md:hidden">
-                  <div className="relative grid grid-cols-2">
+                  <div className="px-4 py-4 text-center">
+                    <p className="text-[1rem] font-semibold tracking-tight text-slate-900">
+                      Ваш рейтинг
+                    </p>
+                  </div>
+
+                  <div className="relative grid grid-cols-2 border-t border-slate-100">
                     <div
                       aria-hidden="true"
-                      className="absolute inset-y-2.5 left-1/2 w-px -translate-x-1/2 bg-slate-200"
+                      className="absolute inset-y-4 left-1/2 w-px -translate-x-1/2 bg-slate-200"
                     />
-                    <div className="px-2.5 py-2.5 text-center">
-                      <p className="text-[0.66rem] font-medium uppercase tracking-[0.08em] text-slate-500">
-                        Elo
-                      </p>
-                      <p className="mt-1 text-[1.28rem] font-semibold leading-none tracking-tight text-slate-950">
+                    <div className="px-4 pb-4 pt-3 text-center">
+                      <p className="text-[2.05rem] font-semibold leading-none tracking-tight text-slate-950">
                         {viewerRatingValue}
+                      </p>
+                      <p className="mt-1 text-[0.92rem] font-medium text-slate-500">
+                        ELO
                       </p>
                     </div>
 
-                    <div className="px-2.5 py-2.5">
-                      <div className="text-center">
-                        <p className="text-[0.66rem] font-medium text-slate-500">Место</p>
-                        <p className="mt-1 text-[1.28rem] font-semibold leading-none tracking-tight text-blue-600">
-                          {viewerPositionValue}
-                        </p>
-                      </div>
+                    <div className="px-4 pb-4 pt-3 text-center">
+                      <p className="text-[2.05rem] font-semibold leading-none tracking-tight text-blue-600">
+                        {viewerPositionValue}
+                      </p>
+                      <p className="mt-1 text-[0.92rem] font-medium text-slate-500">Место</p>
                     </div>
                   </div>
                 </section>
@@ -314,51 +323,74 @@ export default async function RankingPage({ searchParams }: RankingPageProps) {
                     const place = rankingOffset + index + 1;
                     const isViewer = entry.profile.id === viewer.profileId;
                     const winRate = getWinRate(entry.ranking.wins, entry.ranking.matchesPlayed);
+                    const matchesLabel = getRussianCountLabel(
+                      entry.ranking.matchesPlayed,
+                      "матч",
+                      "матча",
+                      "матчей",
+                    );
+                    const winsLabel = getRussianCountLabel(
+                      entry.ranking.wins,
+                      "победа",
+                      "победы",
+                      "побед",
+                    );
+                    const lossesLabel = getRussianCountLabel(
+                      entry.ranking.losses,
+                      "поражение",
+                      "поражения",
+                      "поражений",
+                    );
 
                     return (
                       <article
                         key={entry.ranking.id}
-                        className={`rounded-[var(--radius-default)] border px-3 py-3 shadow-[0_8px_20px_rgba(15,23,42,0.035)] ${
+                        className={`rounded-[var(--radius-default)] border px-4 py-4 shadow-[0_10px_24px_rgba(15,23,42,0.05)] ${
                           isViewer
-                            ? "border-blue-100 bg-blue-50/30"
-                            : "border-slate-200/80 bg-white"
+                            ? "border-blue-200/80 bg-blue-50/50"
+                            : "border-slate-200/90 bg-white"
                         }`}
                       >
-                        <div className="flex items-start justify-between gap-2">
-                          <div className="flex min-w-0 items-start gap-2">
-                            <div className="w-7 shrink-0 text-[0.85rem] font-semibold leading-5 text-slate-400">
+                        <div className="flex items-center justify-between gap-3">
+                          <div className="flex min-w-0 items-start gap-4">
+                            <div
+                              className={`w-10 shrink-0 pt-0.5 text-[1rem] font-medium leading-none ${
+                                isViewer ? "text-blue-600" : "text-slate-400"
+                              }`}
+                            >
                               {formatPlace(place)}
                             </div>
 
-                            <div className="min-w-0">
-                              <div className="flex flex-wrap items-center gap-1">
-                                <h2 className="truncate text-[0.84rem] font-semibold leading-5 text-slate-800">
-                                  {entry.profile.displayName}
-                                </h2>
+                            <div className="min-w-0 space-y-1">
+                              <div className="flex flex-wrap items-center gap-1.5">
                                 {isViewer ? (
-                                  <span className="inline-flex items-center rounded-[var(--radius-default)] bg-blue-100 px-1.5 py-0.5 text-[0.58rem] font-semibold uppercase tracking-[0.05em] text-blue-700">
+                                  <span className="inline-flex h-6 items-center rounded-full bg-blue-100 px-2 text-[0.78rem] font-medium text-blue-700">
                                     Вы
                                   </span>
                                 ) : null}
+                                <h2 className="truncate text-[1rem] font-semibold leading-5 text-slate-900">
+                                  {entry.profile.displayName}
+                                </h2>
+                              </div>
+
+                              <div className="space-y-0.5 text-[0.8rem] leading-5 text-slate-500">
+                                <p>
+                                  {winRate} побед · {entry.ranking.matchesPlayed} {matchesLabel}
+                                </p>
+                                <p>
+                                  {entry.ranking.wins} {winsLabel} · {entry.ranking.losses}{" "}
+                                  {lossesLabel}
+                                </p>
                               </div>
                             </div>
                           </div>
 
-                          <div className="shrink-0 text-right">
-                            <p className="text-[0.58rem] font-semibold uppercase tracking-[0.08em] text-slate-400">
-                              Рейтинг
-                            </p>
-                            <p className="mt-0.5 text-[0.9rem] font-semibold leading-none text-blue-600">
+                          <div className="shrink-0 self-center text-right">
+                            <p className="text-[1.6rem] font-semibold leading-none tracking-tight text-blue-600">
                               {entry.ranking.rating}
                             </p>
+                            <p className="mt-1 text-[0.82rem] font-medium text-slate-400">ELO</p>
                           </div>
-                        </div>
-
-                        <div className="mt-2 grid grid-cols-4 gap-2 border-t border-slate-100 pt-2">
-                          <StatItem label="WIN RATE" value={winRate} />
-                          <StatItem label="Матчи" value={String(entry.ranking.matchesPlayed)} />
-                          <StatItem label="Победы" value={String(entry.ranking.wins)} />
-                          <StatItem label="Поражения" value={String(entry.ranking.losses)} />
                         </div>
                       </article>
                     );
