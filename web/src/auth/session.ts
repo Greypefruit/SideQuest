@@ -12,7 +12,19 @@ export type SessionPayload = {
 };
 
 function getSessionSecret() {
-  return process.env.AUTH_SESSION_SECRET ?? "sidequest-dev-session-secret";
+  const configuredSecret = process.env.AUTH_SESSION_SECRET?.trim();
+
+  if (configuredSecret) {
+    return configuredSecret;
+  }
+
+  if (process.env.NODE_ENV === "production") {
+    throw new Error(
+      "AUTH_SESSION_SECRET must be set in production. Refusing to use the development session secret.",
+    );
+  }
+
+  return "sidequest-dev-session-secret";
 }
 
 function sign(value: string) {
