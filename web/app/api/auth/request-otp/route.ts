@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import {
   createOtpChallenge,
   getLatestOtpChallengeByEmail,
+  invalidateOtpChallenge,
   invalidateActiveOtpChallenges,
 } from "@/src/db/queries";
 import { db } from "@/src/db";
@@ -64,10 +65,10 @@ export async function POST(request: Request) {
   const code = generateOtpCode();
   const expiresAt = new Date(now.getTime() + OTP_TTL_MS);
   const resendAvailableAt = new Date(now.getTime() + OTP_RESEND_COOLDOWN_MS);
-
-  await db.transaction(async (tx) => {
+  const createdChallenge = await db.transaction(async (tx) => {
     await invalidateActiveOtpChallenges(normalizedEmail, tx);
-    await createOtpChallenge(
+
+    return createOtpChallenge(
       {
         email: normalizedEmail,
         codeHash: hashOtpCode(normalizedEmail, code),
@@ -78,7 +79,30 @@ export async function POST(request: Request) {
     );
   });
 
-  await sendOtpEmail(normalizedEmail, code);
+  try {
+    await sendOtpEmail(normalizedEmail, code);
+  } catch (error) {
+    try {
+      await invalidateOtpChallenge(createdChallenge.id);
+    } catch (invalidationError) {
+      console.error("Failed to invalidate OTP challenge after email delivery error", {
+        email: normalizedEmail,
+        challengeId: createdChallenge.id,
+        error: invalidationError,
+      });
+    }
+
+    console.error("Failed to send OTP email", {
+      email: normalizedEmail,
+      challengeId: createdChallenge.id,
+      error,
+    });
+
+    return NextResponse.json(
+      { ok: false, message: AUTH_MESSAGES.otpDeliveryFailed },
+      { status: 500 },
+    );
+  }
 
   return NextResponse.json({
     ok: true,

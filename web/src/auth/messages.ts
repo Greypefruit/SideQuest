@@ -4,6 +4,7 @@ export const AUTH_MESSAGES = {
   emptyCode: "Введите код подтверждения",
   expiredCode: "Срок действия кода истек",
   requestNewCode: "Запросите новый код",
+  otpDeliveryFailed: "Не удалось отправить код. Попробуйте еще раз позже.",
   tooManyAttempts: "Слишком много попыток. Запросите новый код",
   accessDisabled: "Ваш доступ отключен. Обратитесь к администратору",
 } as const;

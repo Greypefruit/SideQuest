@@ -127,6 +127,30 @@ export async function markOtpChallengeExpired(
   return challenge ?? null;
 }
 
+export async function invalidateOtpChallenge(
+  challengeId: string,
+  database?: DbExecutor,
+) {
+  const now = new Date();
+
+  const [challenge] = await getDb(database)
+    .update(authOtpChallenges)
+    .set({
+      invalidatedAt: now,
+      updatedAt: now,
+    })
+    .where(
+      and(
+        eq(authOtpChallenges.id, challengeId),
+        isNull(authOtpChallenges.consumedAt),
+        isNull(authOtpChallenges.invalidatedAt),
+      ),
+    )
+    .returning();
+
+  return challenge ?? null;
+}
+
 export async function registerFailedOtpAttempt(
   challengeId: string,
   nextAttemptsCount: number,
