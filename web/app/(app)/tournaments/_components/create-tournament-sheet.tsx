@@ -17,16 +17,15 @@ const INITIAL_FORM_STATE = {
   error: null as string | null,
 };
 
-const HOUR_OPTIONS = Array.from({ length: 24 }, (_, index) => String(index).padStart(2, "0"));
-const MINUTE_OPTIONS = ["00", "15", "30", "45"] as const;
-
-function getTodayDateInputValue() {
+function getDefaultScheduledAtValue() {
   const now = new Date();
-  const year = String(now.getFullYear());
+  const year = String(now.getFullYear()).slice(-2);
   const month = String(now.getMonth() + 1).padStart(2, "0");
   const day = String(now.getDate()).padStart(2, "0");
+  const hours = String(now.getHours()).padStart(2, "0");
+  const minutes = String(now.getMinutes()).padStart(2, "0");
 
-  return `${year}-${month}-${day}`;
+  return `${day}.${month}.${year} ${hours}:${minutes}`;
 }
 
 function CloseIcon() {
@@ -80,7 +79,6 @@ export function CreateTournamentSheet({
 }: CreateTournamentSheetProps) {
   const router = useRouter();
   const [state, formAction] = useActionState(createTournamentAction, INITIAL_FORM_STATE);
-  const minScheduledDate = getTodayDateInputValue();
 
   useEffect(() => {
     if (!isOpen) {
@@ -214,81 +212,47 @@ export function CreateTournamentSheet({
               </div>
             </fieldset>
 
-            <div className="grid gap-3 md:grid-cols-2">
+            <div className="grid grid-cols-[minmax(0,1fr)_7rem] gap-3 md:grid-cols-[minmax(0,1fr)_8rem]">
               <div className="space-y-2">
                 <label
-                  htmlFor="scheduledDate"
+                  htmlFor="scheduledAt"
                   className="block text-[0.68rem] font-semibold uppercase tracking-[0.08em] text-slate-500"
                 >
-                  Дата <RequiredMark />
+                  Дата и время <RequiredMark />
                 </label>
                 <input
-                  id="scheduledDate"
-                  name="scheduledDate"
-                  min={minScheduledDate}
+                  id="scheduledAt"
+                  name="scheduledAt"
                   required
-                  type="date"
+                  type="text"
+                  inputMode="numeric"
+                  autoComplete="off"
+                  defaultValue={getDefaultScheduledAtValue()}
+                  placeholder="12.05.26 14:01"
+                  className="min-h-11 w-full rounded-[var(--radius-default)] border border-slate-200 px-3.5 text-[0.95rem] text-slate-900 outline-none transition placeholder:text-slate-400 focus:border-blue-400 focus:ring-2 focus:ring-blue-100 md:min-h-10 md:text-[0.92rem]"
+                />
+                <p className="text-[0.8rem] text-slate-500">
+                  Формат: дд.мм.гг чч:мм
+                </p>
+              </div>
+
+              <div className="space-y-2">
+                <label
+                  htmlFor="maxParticipants"
+                  className="block text-[0.68rem] font-semibold uppercase tracking-[0.08em] text-slate-500"
+                >
+                  Лимит <RequiredMark />
+                </label>
+                <input
+                  id="maxParticipants"
+                  name="maxParticipants"
+                  type="number"
+                  min={2}
+                  defaultValue={8}
+                  required
                   className="min-h-11 w-full rounded-[var(--radius-default)] border border-slate-200 px-3.5 text-[0.95rem] text-slate-900 outline-none transition focus:border-blue-400 focus:ring-2 focus:ring-blue-100 md:min-h-10 md:text-[0.92rem]"
                 />
               </div>
-
-              <div className="space-y-2">
-                <p className="block text-[0.68rem] font-semibold uppercase tracking-[0.08em] text-slate-500">
-                  Время <RequiredMark />
-                </p>
-                <div className="grid grid-cols-2 gap-2">
-                  <select
-                    aria-label="Часы проведения"
-                    className="min-h-11 w-full appearance-none rounded-[var(--radius-default)] border border-slate-200 bg-[linear-gradient(45deg,transparent_50%,#64748b_50%),linear-gradient(135deg,#64748b_50%,transparent_50%)] bg-[position:calc(100%-18px)_50%,calc(100%-12px)_50%] bg-[size:6px_6px,6px_6px] bg-no-repeat bg-white px-3 pr-8 text-[0.95rem] text-slate-900 outline-none transition focus:border-blue-400 focus:ring-2 focus:ring-blue-100 md:min-h-10 md:text-[0.92rem]"
-                    defaultValue=""
-                    name="scheduledHour"
-                    required
-                  >
-                    <option value="" disabled>
-                      Часы
-                    </option>
-                    {HOUR_OPTIONS.map((hour) => (
-                      <option key={hour} value={hour}>
-                        {hour}
-                      </option>
-                    ))}
-                  </select>
-                  <select
-                    aria-label="Минуты проведения"
-                    className="min-h-11 w-full appearance-none rounded-[var(--radius-default)] border border-slate-200 bg-[linear-gradient(45deg,transparent_50%,#64748b_50%),linear-gradient(135deg,#64748b_50%,transparent_50%)] bg-[position:calc(100%-18px)_50%,calc(100%-12px)_50%] bg-[size:6px_6px,6px_6px] bg-no-repeat bg-white px-3 pr-8 text-[0.95rem] text-slate-900 outline-none transition focus:border-blue-400 focus:ring-2 focus:ring-blue-100 md:min-h-10 md:text-[0.92rem]"
-                    defaultValue=""
-                    name="scheduledMinute"
-                    required
-                  >
-                    <option value="" disabled>
-                      Минуты
-                    </option>
-                    {MINUTE_OPTIONS.map((minute) => (
-                      <option key={minute} value={minute}>
-                        {minute}
-                      </option>
-                    ))}
-                  </select>
-                </div>
-              </div>
-            </div>
-
-            <div className="space-y-2">
-              <label
-                htmlFor="maxParticipants"
-                className="block text-[0.68rem] font-semibold uppercase tracking-[0.08em] text-slate-500"
-              >
-                Лимит участников <RequiredMark />
-              </label>
-              <input
-                id="maxParticipants"
-                name="maxParticipants"
-                type="number"
-                min={2}
-                defaultValue={8}
-                required
-                className="min-h-11 w-full rounded-[var(--radius-default)] border border-slate-200 px-3.5 text-[0.95rem] text-slate-900 outline-none transition focus:border-blue-400 focus:ring-2 focus:ring-blue-100 md:min-h-10 md:text-[0.92rem]"
-              />
             </div>
 
             <div className="space-y-2">

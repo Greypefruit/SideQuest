@@ -143,26 +143,46 @@ function parseOptionalScheduledAt(rawDate: string, rawTime: string) {
   return { ok: true as const, value: scheduledAt };
 }
 
-function parseRequiredScheduledAt(rawDate: string, rawHour: string, rawMinute: string) {
-  const dateValue = rawDate.trim();
-  const hourValue = rawHour.trim();
-  const minuteValue = rawMinute.trim();
+function parseRequiredScheduledAtInput(rawValue: string) {
+  const value = rawValue.trim();
 
-  if (!dateValue) {
+  if (!value) {
     return {
       ok: false as const,
-      message: "Укажите дату проведения.",
+      message: "Укажите дату и время проведения.",
     };
   }
 
-  if (!hourValue || !minuteValue) {
+  const match = /^(\d{2})\.(\d{2})\.(\d{2}|\d{4})\s+(\d{2}):(\d{2})$/.exec(value);
+
+  if (!match) {
     return {
       ok: false as const,
-      message: "Укажите время проведения.",
+      message: "Укажите дату и время в формате дд.мм.гг чч:мм.",
     };
   }
 
-  return parseOptionalScheduledAt(dateValue, `${hourValue}:${minuteValue}`);
+  const [, dayText, monthText, yearText, hoursText, minutesText] = match;
+  const year =
+    yearText.length === 2
+      ? 2000 + Number.parseInt(yearText, 10)
+      : Number.parseInt(yearText, 10);
+  const month = Number.parseInt(monthText, 10);
+  const day = Number.parseInt(dayText, 10);
+  const hours = Number.parseInt(hoursText, 10);
+  const minutes = Number.parseInt(minutesText, 10);
+
+  if (hours > 23 || minutes > 59) {
+    return {
+      ok: false as const,
+      message: "Укажите корректное время в формате чч:мм.",
+    };
+  }
+
+  const dateValue = `${String(year).padStart(4, "0")}-${String(month).padStart(2, "0")}-${String(day).padStart(2, "0")}`;
+  const timeValue = `${String(hours).padStart(2, "0")}:${String(minutes).padStart(2, "0")}`;
+
+  return parseOptionalScheduledAt(dateValue, timeValue);
 }
 
 function buildTournamentActionError(message: string) {
@@ -555,9 +575,7 @@ export async function createTournamentAction(
   const matchFormatValue = String(formData.get("matchFormat") ?? "").trim();
   const location = String(formData.get("location") ?? "").trim();
   const maxParticipantsValue = String(formData.get("maxParticipants") ?? "").trim();
-  const rawDate = String(formData.get("scheduledDate") ?? "");
-  const rawHour = String(formData.get("scheduledHour") ?? "");
-  const rawMinute = String(formData.get("scheduledMinute") ?? "");
+  const scheduledAtValue = String(formData.get("scheduledAt") ?? "");
 
   if (!title) {
     return { error: "Введите название турнира." };
@@ -581,7 +599,7 @@ export async function createTournamentAction(
     return { error: parsedMaxParticipants.message };
   }
 
-  const parsedScheduledAt = parseRequiredScheduledAt(rawDate, rawHour, rawMinute);
+  const parsedScheduledAt = parseRequiredScheduledAtInput(scheduledAtValue);
 
   if (!parsedScheduledAt.ok) {
     return { error: parsedScheduledAt.message };

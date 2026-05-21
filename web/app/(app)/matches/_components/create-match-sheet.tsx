@@ -212,6 +212,10 @@ export function CreateMatchSheet({
     });
   }, [selectedFormat, selectedWinner]);
 
+  const canChooseFormat = selectedOpponent !== null;
+  const canChooseWinner = selectedOpponent !== null && selectedFormat !== null;
+  const canChooseScore = selectedWinner !== null;
+
   const isFormValid =
     selectedOpponent !== null &&
     selectedFormat !== null &&
@@ -344,6 +348,7 @@ export function CreateMatchSheet({
                     setInteractionHint(null);
                     setOpponentQuery(event.target.value);
                     setSelectedOpponent(null);
+                    setSelectedFormat(null);
                     setSelectedWinner(null);
                     setSelectedScore(null);
                     setIsOpponentListOpen(true);
@@ -385,6 +390,11 @@ export function CreateMatchSheet({
 
             <div className="space-y-2.5">
               <FieldLabel>Формат матча</FieldLabel>
+              {!canChooseFormat ? (
+                <p className="text-[0.8rem] text-amber-600">
+                  Сначала выберите соперника, чтобы открыть формат матча.
+                </p>
+              ) : null}
               <div className="grid grid-cols-3 gap-2">
                 {(["BO1", "BO3", "BO5"] as MatchFormat[]).map((format) => {
                   const isActive = selectedFormat === format;
@@ -395,11 +405,19 @@ export function CreateMatchSheet({
                       className={`inline-flex min-h-12 items-center justify-center rounded-[var(--radius-default)] border text-[0.95rem] font-semibold transition ${
                         isActive
                           ? "border-blue-600 bg-blue-50 text-blue-700"
-                          : "border-slate-200 bg-white text-slate-600 hover:border-slate-300 hover:bg-slate-50"
+                          : !canChooseFormat
+                            ? "border-amber-200 bg-amber-50/70 text-amber-500"
+                            : "border-slate-200 bg-white text-slate-600 hover:border-slate-300 hover:bg-slate-50"
                       }`}
                       onClick={() => {
+                        if (!canChooseFormat) {
+                          setInteractionHint("Сначала выберите соперника.");
+                          return;
+                        }
+
                         setInteractionHint(null);
                         setSelectedFormat(format);
+                        setSelectedWinner(null);
                         setSelectedScore(null);
                       }}
                       type="button"
@@ -413,11 +431,17 @@ export function CreateMatchSheet({
 
             <div className="space-y-2.5">
               <FieldLabel>Победитель</FieldLabel>
+              {!canChooseWinner ? (
+                <p className="text-[0.8rem] text-amber-600">
+                  {selectedOpponent
+                    ? "Сначала выберите формат матча, затем укажите победителя."
+                    : "Сначала выберите соперника и формат матча."}
+                </p>
+              ) : null}
               <div className="grid gap-2 md:grid-cols-2 md:items-stretch">
                 {winnerOptions.map((winnerOption) => {
                   const isActive = selectedWinner === winnerOption.value;
-                  const isDisabled =
-                    winnerOption.value === "player2" && selectedOpponent === null;
+                  const isDisabled = !canChooseWinner;
 
                   return (
                     <button
@@ -431,7 +455,11 @@ export function CreateMatchSheet({
                       }`}
                       onClick={() => {
                         if (isDisabled) {
-                          setInteractionHint("Сначала выберите соперника.");
+                          setInteractionHint(
+                            selectedOpponent
+                              ? "Сначала выберите формат матча."
+                              : "Сначала выберите соперника.",
+                          );
                           return;
                         }
 
@@ -450,11 +478,17 @@ export function CreateMatchSheet({
 
             <div className="space-y-2.5">
               <FieldLabel>Итоговый счет</FieldLabel>
+              {!canChooseScore ? (
+                <p className="text-[0.8rem] text-amber-600">
+                  Счет станет доступен после выбора победителя.
+                </p>
+              ) : null}
               <div className="grid grid-cols-2 gap-2 sm:grid-cols-3">
                 {availableScores.map((scoreOption) => {
                   const isActive =
                     selectedScore?.player1 === scoreOption.player1 &&
                     selectedScore?.player2 === scoreOption.player2;
+                  const isDisabled = !canChooseScore;
 
                   return (
                     <button
@@ -462,9 +496,16 @@ export function CreateMatchSheet({
                       className={`inline-flex min-h-10 items-center justify-center rounded-[var(--radius-default)] border text-[0.88rem] font-semibold transition ${
                         isActive
                           ? "border-blue-500 bg-blue-50 text-blue-700"
-                          : "border-slate-200 bg-white text-slate-700 hover:border-slate-300 hover:bg-slate-50"
+                          : isDisabled
+                            ? "border-slate-200 bg-slate-50 text-slate-400"
+                            : "border-slate-200 bg-white text-slate-700 hover:border-slate-300 hover:bg-slate-50"
                       }`}
                       onClick={() => {
+                        if (isDisabled) {
+                          setInteractionHint("Сначала укажите победителя.");
+                          return;
+                        }
+
                         setInteractionHint(null);
                         setSelectedScore(scoreOption);
                       }}
@@ -476,23 +517,6 @@ export function CreateMatchSheet({
                 })}
               </div>
 
-              {!selectedFormat || !selectedWinner ? (
-                <button
-                  className="inline-flex min-h-10 w-full items-center justify-center rounded-[var(--radius-default)] border border-dashed border-slate-200 bg-slate-50 text-[0.84rem] font-medium text-slate-500 transition hover:bg-slate-100"
-                  onClick={() =>
-                    setInteractionHint(
-                      !selectedFormat
-                        ? "Сначала выберите формат матча."
-                        : "Сначала укажите победителя.",
-                    )
-                  }
-                  type="button"
-                >
-                  {!selectedFormat
-                    ? "Счет станет доступен после выбора формата"
-                    : "Счет станет доступен после выбора победителя"}
-                </button>
-              ) : null}
             </div>
           </div>
         </div>
