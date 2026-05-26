@@ -76,6 +76,9 @@ function getTransporter(config: SmtpConfig) {
     host: config.host,
     port: config.port,
     secure: config.secure,
+    connectionTimeout: 10000,
+    greetingTimeout: 10000,
+    socketTimeout: 15000,
     auth: {
       user: config.user,
       pass: config.password,
