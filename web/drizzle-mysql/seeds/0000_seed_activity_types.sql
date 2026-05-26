@@ -1,6 +1,13 @@
 INSERT INTO activity_types (id, code, name_ru, is_active, created_at, updated_at)
-VALUES (UUID(), 'table_tennis', 'Настольный теннис', true, NOW(), NOW())
+VALUES (
+  UUID(),
+  'table_tennis',
+  CONVERT(UNHEX('D09DD0B0D181D182D0BED0BBD18CD0BDD18BD0B920D182D0B5D0BDD0BDD0B8D181') USING utf8mb4),
+  true,
+  NOW(),
+  NOW()
+)
 ON DUPLICATE KEY UPDATE
-  name_ru = VALUES(name_ru),
+  name_ru = CONVERT(UNHEX('D09DD0B0D181D182D0BED0BBD18CD0BDD18BD0B920D182D0B5D0BDD0BDD0B8D181') USING utf8mb4),
   is_active = VALUES(is_active),
   updated_at = NOW();
