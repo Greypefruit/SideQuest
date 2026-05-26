@@ -1,6 +1,6 @@
 import "server-only";
 import { and, asc, desc, eq, inArray, or } from "drizzle-orm";
-import { alias } from "drizzle-orm/pg-core";
+import { alias } from "drizzle-orm/mysql-core";
 import { type DbExecutor } from "../index";
 import { competitionMatches, competitions, participants, profiles } from "../schema";
 import { getDb } from "./shared";

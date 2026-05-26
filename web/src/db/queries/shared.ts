@@ -1,6 +1,6 @@
 import "server-only";
 import { asc, desc, getTableColumns, sql } from "drizzle-orm";
-import { type AnyPgColumn } from "drizzle-orm/pg-core";
+import { type AnyMySqlColumn } from "drizzle-orm/mysql-core";
 import { db, type DbExecutor } from "../index";
 import { activityTypes, participants, profiles, rankings } from "../schema";
 
@@ -18,7 +18,7 @@ export function hasValues<T extends Record<string, unknown>>(value: T) {
   return Object.keys(value).length > 0;
 }
 
-export function eqNormalizedEmail(column: AnyPgColumn, email: string) {
+export function eqNormalizedEmail(column: AnyMySqlColumn, email: string) {
   return sql`lower(${column}) = ${normalizeEmail(email)}`;
 }
 

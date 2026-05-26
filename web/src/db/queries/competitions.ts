@@ -1,6 +1,6 @@
 import "server-only";
 import { and, desc, eq, inArray, or, sql } from "drizzle-orm";
-import { alias } from "drizzle-orm/pg-core";
+import { alias } from "drizzle-orm/mysql-core";
 import { type DbExecutor } from "../index";
 import {
   activityTypes,
