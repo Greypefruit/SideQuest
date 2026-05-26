@@ -1,0 +1,1232 @@
+{
+  "version": "5",
+  "dialect": "mysql",
+  "id": "e77f9009-3e55-4da9-94c5-d0e032c9e871",
+  "prevId": "00000000-0000-0000-0000-000000000000",
+  "tables": {
+    "activity_types": {
+      "name": "activity_types",
+      "columns": {
+        "id": {
+          "name": "id",
+          "type": "varchar(36)",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "code": {
+          "name": "code",
+          "type": "varchar(64)",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "name_ru": {
+          "name": "name_ru",
+          "type": "varchar(120)",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "is_active": {
+          "name": "is_active",
+          "type": "boolean",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false,
+          "default": true
+        },
+        "created_at": {
+          "name": "created_at",
+          "type": "timestamp",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false,
+          "default": "(now())"
+        },
+        "updated_at": {
+          "name": "updated_at",
+          "type": "timestamp",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false,
+          "default": "(now())"
+        }
+      },
+      "indexes": {},
+      "foreignKeys": {},
+      "compositePrimaryKeys": {
+        "activity_types_id": {
+          "name": "activity_types_id",
+          "columns": [
+            "id"
+          ]
+        }
+      },
+      "uniqueConstraints": {
+        "activity_types_code_unique": {
+          "name": "activity_types_code_unique",
+          "columns": [
+            "code"
+          ]
+        }
+      },
+      "checkConstraint": {
+        "activity_types_code_not_empty": {
+          "name": "activity_types_code_not_empty",
+          "value": "char_length(trim(`activity_types`.`code`)) > 0"
+        },
+        "activity_types_name_ru_not_empty": {
+          "name": "activity_types_name_ru_not_empty",
+          "value": "char_length(trim(`activity_types`.`name_ru`)) > 0"
+        }
+      }
+    },
+    "auth_otp_challenges": {
+      "name": "auth_otp_challenges",
+      "columns": {
+        "id": {
+          "name": "id",
+          "type": "varchar(36)",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "email": {
+          "name": "email",
+          "type": "varchar(255)",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "code_hash": {
+          "name": "code_hash",
+          "type": "varchar(64)",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "attempts_count": {
+          "name": "attempts_count",
+          "type": "int",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false,
+          "default": 0
+        },
+        "expires_at": {
+          "name": "expires_at",
+          "type": "timestamp",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "resend_available_at": {
+          "name": "resend_available_at",
+          "type": "timestamp",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "consumed_at": {
+          "name": "consumed_at",
+          "type": "timestamp",
+          "primaryKey": false,
+          "notNull": false,
+          "autoincrement": false
+        },
+        "invalidated_at": {
+          "name": "invalidated_at",
+          "type": "timestamp",
+          "primaryKey": false,
+          "notNull": false,
+          "autoincrement": false
+        },
+        "created_at": {
+          "name": "created_at",
+          "type": "timestamp",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false,
+          "default": "(now())"
+        },
+        "updated_at": {
+          "name": "updated_at",
+          "type": "timestamp",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false,
+          "default": "(now())"
+        }
+      },
+      "indexes": {},
+      "foreignKeys": {},
+      "compositePrimaryKeys": {
+        "auth_otp_challenges_id": {
+          "name": "auth_otp_challenges_id",
+          "columns": [
+            "id"
+          ]
+        }
+      },
+      "uniqueConstraints": {},
+      "checkConstraint": {
+        "auth_otp_challenges_email_not_empty": {
+          "name": "auth_otp_challenges_email_not_empty",
+          "value": "char_length(trim(`auth_otp_challenges`.`email`)) > 0"
+        },
+        "auth_otp_challenges_attempts_count_valid": {
+          "name": "auth_otp_challenges_attempts_count_valid",
+          "value": "`auth_otp_challenges`.`attempts_count` >= 0 and `auth_otp_challenges`.`attempts_count` <= 5"
+        }
+      }
+    },
+    "competition_matches": {
+      "name": "competition_matches",
+      "columns": {
+        "id": {
+          "name": "id",
+          "type": "varchar(36)",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "competition_id": {
+          "name": "competition_id",
+          "type": "varchar(36)",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "round_number": {
+          "name": "round_number",
+          "type": "int",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "match_number": {
+          "name": "match_number",
+          "type": "int",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "slot1_participant_id": {
+          "name": "slot1_participant_id",
+          "type": "varchar(36)",
+          "primaryKey": false,
+          "notNull": false,
+          "autoincrement": false
+        },
+        "slot2_participant_id": {
+          "name": "slot2_participant_id",
+          "type": "varchar(36)",
+          "primaryKey": false,
+          "notNull": false,
+          "autoincrement": false
+        },
+        "slot1_score": {
+          "name": "slot1_score",
+          "type": "int",
+          "primaryKey": false,
+          "notNull": false,
+          "autoincrement": false
+        },
+        "slot2_score": {
+          "name": "slot2_score",
+          "type": "int",
+          "primaryKey": false,
+          "notNull": false,
+          "autoincrement": false
+        },
+        "winner_participant_id": {
+          "name": "winner_participant_id",
+          "type": "varchar(36)",
+          "primaryKey": false,
+          "notNull": false,
+          "autoincrement": false
+        },
+        "status": {
+          "name": "status",
+          "type": "enum('pending','completed')",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false,
+          "default": "'pending'"
+        },
+        "resolution_type": {
+          "name": "resolution_type",
+          "type": "enum('played','bye')",
+          "primaryKey": false,
+          "notNull": false,
+          "autoincrement": false
+        },
+        "next_match_id": {
+          "name": "next_match_id",
+          "type": "varchar(36)",
+          "primaryKey": false,
+          "notNull": false,
+          "autoincrement": false
+        },
+        "next_match_slot": {
+          "name": "next_match_slot",
+          "type": "int",
+          "primaryKey": false,
+          "notNull": false,
+          "autoincrement": false
+        },
+        "reported_by_profile_id": {
+          "name": "reported_by_profile_id",
+          "type": "varchar(36)",
+          "primaryKey": false,
+          "notNull": false,
+          "autoincrement": false
+        },
+        "completed_at": {
+          "name": "completed_at",
+          "type": "timestamp",
+          "primaryKey": false,
+          "notNull": false,
+          "autoincrement": false
+        },
+        "created_at": {
+          "name": "created_at",
+          "type": "timestamp",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false,
+          "default": "(now())"
+        },
+        "updated_at": {
+          "name": "updated_at",
+          "type": "timestamp",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false,
+          "default": "(now())"
+        }
+      },
+      "indexes": {},
+      "foreignKeys": {
+        "competition_matches_competition_id_competitions_id_fk": {
+          "name": "competition_matches_competition_id_competitions_id_fk",
+          "tableFrom": "competition_matches",
+          "tableTo": "competitions",
+          "columnsFrom": [
+            "competition_id"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "no action",
+          "onUpdate": "no action"
+        },
+        "competition_matches_slot1_participant_id_participants_id_fk": {
+          "name": "competition_matches_slot1_participant_id_participants_id_fk",
+          "tableFrom": "competition_matches",
+          "tableTo": "participants",
+          "columnsFrom": [
+            "slot1_participant_id"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "no action",
+          "onUpdate": "no action"
+        },
+        "competition_matches_slot2_participant_id_participants_id_fk": {
+          "name": "competition_matches_slot2_participant_id_participants_id_fk",
+          "tableFrom": "competition_matches",
+          "tableTo": "participants",
+          "columnsFrom": [
+            "slot2_participant_id"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "no action",
+          "onUpdate": "no action"
+        },
+        "competition_matches_winner_participant_id_participants_id_fk": {
+          "name": "competition_matches_winner_participant_id_participants_id_fk",
+          "tableFrom": "competition_matches",
+          "tableTo": "participants",
+          "columnsFrom": [
+            "winner_participant_id"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "no action",
+          "onUpdate": "no action"
+        },
+        "competition_matches_reported_by_profile_id_profiles_id_fk": {
+          "name": "competition_matches_reported_by_profile_id_profiles_id_fk",
+          "tableFrom": "competition_matches",
+          "tableTo": "profiles",
+          "columnsFrom": [
+            "reported_by_profile_id"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "no action",
+          "onUpdate": "no action"
+        },
+        "competition_matches_next_match_id_competition_matches_id_fk": {
+          "name": "competition_matches_next_match_id_competition_matches_id_fk",
+          "tableFrom": "competition_matches",
+          "tableTo": "competition_matches",
+          "columnsFrom": [
+            "next_match_id"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "no action",
+          "onUpdate": "no action"
+        }
+      },
+      "compositePrimaryKeys": {
+        "competition_matches_id": {
+          "name": "competition_matches_id",
+          "columns": [
+            "id"
+          ]
+        }
+      },
+      "uniqueConstraints": {
+        "competition_matches_round_match_unique": {
+          "name": "competition_matches_round_match_unique",
+          "columns": [
+            "competition_id",
+            "round_number",
+            "match_number"
+          ]
+        }
+      },
+      "checkConstraint": {
+        "competition_matches_round_positive": {
+          "name": "competition_matches_round_positive",
+          "value": "`competition_matches`.`round_number` > 0"
+        },
+        "competition_matches_match_positive": {
+          "name": "competition_matches_match_positive",
+          "value": "`competition_matches`.`match_number` > 0"
+        },
+        "competition_matches_slot1_score_non_negative": {
+          "name": "competition_matches_slot1_score_non_negative",
+          "value": "`competition_matches`.`slot1_score` is null or `competition_matches`.`slot1_score` >= 0"
+        },
+        "competition_matches_slot2_score_non_negative": {
+          "name": "competition_matches_slot2_score_non_negative",
+          "value": "`competition_matches`.`slot2_score` is null or `competition_matches`.`slot2_score` >= 0"
+        },
+        "competition_matches_next_match_slot_valid": {
+          "name": "competition_matches_next_match_slot_valid",
+          "value": "`competition_matches`.`next_match_slot` is null or `competition_matches`.`next_match_slot` in (1, 2)"
+        },
+        "competition_matches_completed_requires_resolution": {
+          "name": "competition_matches_completed_requires_resolution",
+          "value": "`competition_matches`.`status` <> 'completed' or `competition_matches`.`resolution_type` is not null"
+        },
+        "competition_matches_bye_shape": {
+          "name": "competition_matches_bye_shape",
+          "value": "`competition_matches`.`resolution_type` <> 'bye' or (\n        (\n          `competition_matches`.`slot1_participant_id` is not null and\n          `competition_matches`.`slot2_participant_id` is null and\n          `competition_matches`.`winner_participant_id` = `competition_matches`.`slot1_participant_id`\n        ) or (\n          `competition_matches`.`slot2_participant_id` is not null and\n          `competition_matches`.`slot1_participant_id` is null and\n          `competition_matches`.`winner_participant_id` = `competition_matches`.`slot2_participant_id`\n        )\n      )"
+        },
+        "competition_matches_played_shape": {
+          "name": "competition_matches_played_shape",
+          "value": "`competition_matches`.`resolution_type` <> 'played' or (\n        `competition_matches`.`slot1_participant_id` is not null and\n        `competition_matches`.`slot2_participant_id` is not null and\n        `competition_matches`.`winner_participant_id` in (`competition_matches`.`slot1_participant_id`, `competition_matches`.`slot2_participant_id`) and\n        `competition_matches`.`slot1_score` is not null and\n        `competition_matches`.`slot2_score` is not null\n      )"
+        }
+      }
+    },
+    "competition_participants": {
+      "name": "competition_participants",
+      "columns": {
+        "id": {
+          "name": "id",
+          "type": "varchar(36)",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "competition_id": {
+          "name": "competition_id",
+          "type": "varchar(36)",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "participant_id": {
+          "name": "participant_id",
+          "type": "varchar(36)",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "added_by_profile_id": {
+          "name": "added_by_profile_id",
+          "type": "varchar(36)",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "rating_at_seeding": {
+          "name": "rating_at_seeding",
+          "type": "int",
+          "primaryKey": false,
+          "notNull": false,
+          "autoincrement": false
+        },
+        "created_at": {
+          "name": "created_at",
+          "type": "timestamp",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false,
+          "default": "(now())"
+        }
+      },
+      "indexes": {},
+      "foreignKeys": {
+        "competition_participants_competition_id_competitions_id_fk": {
+          "name": "competition_participants_competition_id_competitions_id_fk",
+          "tableFrom": "competition_participants",
+          "tableTo": "competitions",
+          "columnsFrom": [
+            "competition_id"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "no action",
+          "onUpdate": "no action"
+        },
+        "competition_participants_participant_id_participants_id_fk": {
+          "name": "competition_participants_participant_id_participants_id_fk",
+          "tableFrom": "competition_participants",
+          "tableTo": "participants",
+          "columnsFrom": [
+            "participant_id"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "no action",
+          "onUpdate": "no action"
+        },
+        "competition_participants_added_by_profile_id_profiles_id_fk": {
+          "name": "competition_participants_added_by_profile_id_profiles_id_fk",
+          "tableFrom": "competition_participants",
+          "tableTo": "profiles",
+          "columnsFrom": [
+            "added_by_profile_id"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "no action",
+          "onUpdate": "no action"
+        }
+      },
+      "compositePrimaryKeys": {
+        "competition_participants_id": {
+          "name": "competition_participants_id",
+          "columns": [
+            "id"
+          ]
+        }
+      },
+      "uniqueConstraints": {
+        "competition_participants_competition_participant_unique": {
+          "name": "competition_participants_competition_participant_unique",
+          "columns": [
+            "competition_id",
+            "participant_id"
+          ]
+        }
+      },
+      "checkConstraint": {}
+    },
+    "competitions": {
+      "name": "competitions",
+      "columns": {
+        "id": {
+          "name": "id",
+          "type": "varchar(36)",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "activity_type_id": {
+          "name": "activity_type_id",
+          "type": "varchar(36)",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "title": {
+          "name": "title",
+          "type": "varchar(255)",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "format": {
+          "name": "format",
+          "type": "enum('single_elimination')",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false,
+          "default": "'single_elimination'"
+        },
+        "match_format": {
+          "name": "match_format",
+          "type": "enum('BO1','BO3','BO5')",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "status": {
+          "name": "status",
+          "type": "enum('draft','registration','ready','in_progress','completed','cancelled')",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false,
+          "default": "'draft'"
+        },
+        "max_participants": {
+          "name": "max_participants",
+          "type": "int",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false,
+          "default": 16
+        },
+        "scheduled_at": {
+          "name": "scheduled_at",
+          "type": "timestamp",
+          "primaryKey": false,
+          "notNull": false,
+          "autoincrement": false
+        },
+        "location": {
+          "name": "location",
+          "type": "varchar(255)",
+          "primaryKey": false,
+          "notNull": false,
+          "autoincrement": false
+        },
+        "created_by_profile_id": {
+          "name": "created_by_profile_id",
+          "type": "varchar(36)",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "started_at": {
+          "name": "started_at",
+          "type": "timestamp",
+          "primaryKey": false,
+          "notNull": false,
+          "autoincrement": false
+        },
+        "completed_at": {
+          "name": "completed_at",
+          "type": "timestamp",
+          "primaryKey": false,
+          "notNull": false,
+          "autoincrement": false
+        },
+        "created_at": {
+          "name": "created_at",
+          "type": "timestamp",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false,
+          "default": "(now())"
+        },
+        "updated_at": {
+          "name": "updated_at",
+          "type": "timestamp",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false,
+          "default": "(now())"
+        }
+      },
+      "indexes": {},
+      "foreignKeys": {
+        "competitions_activity_type_id_activity_types_id_fk": {
+          "name": "competitions_activity_type_id_activity_types_id_fk",
+          "tableFrom": "competitions",
+          "tableTo": "activity_types",
+          "columnsFrom": [
+            "activity_type_id"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "no action",
+          "onUpdate": "no action"
+        },
+        "competitions_created_by_profile_id_profiles_id_fk": {
+          "name": "competitions_created_by_profile_id_profiles_id_fk",
+          "tableFrom": "competitions",
+          "tableTo": "profiles",
+          "columnsFrom": [
+            "created_by_profile_id"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "no action",
+          "onUpdate": "no action"
+        }
+      },
+      "compositePrimaryKeys": {
+        "competitions_id": {
+          "name": "competitions_id",
+          "columns": [
+            "id"
+          ]
+        }
+      },
+      "uniqueConstraints": {},
+      "checkConstraint": {
+        "competitions_title_not_empty": {
+          "name": "competitions_title_not_empty",
+          "value": "char_length(trim(`competitions`.`title`)) > 0"
+        },
+        "competitions_max_participants_positive": {
+          "name": "competitions_max_participants_positive",
+          "value": "`competitions`.`max_participants` >= 2"
+        }
+      }
+    },
+    "matches": {
+      "name": "matches",
+      "columns": {
+        "id": {
+          "name": "id",
+          "type": "varchar(36)",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "activity_type_id": {
+          "name": "activity_type_id",
+          "type": "varchar(36)",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "participant1_id": {
+          "name": "participant1_id",
+          "type": "varchar(36)",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "participant2_id": {
+          "name": "participant2_id",
+          "type": "varchar(36)",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "match_format": {
+          "name": "match_format",
+          "type": "enum('BO1','BO3','BO5')",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "participant1_score": {
+          "name": "participant1_score",
+          "type": "int",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "participant2_score": {
+          "name": "participant2_score",
+          "type": "int",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "winner_participant_id": {
+          "name": "winner_participant_id",
+          "type": "varchar(36)",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "created_by_profile_id": {
+          "name": "created_by_profile_id",
+          "type": "varchar(36)",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "played_at": {
+          "name": "played_at",
+          "type": "timestamp",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "created_at": {
+          "name": "created_at",
+          "type": "timestamp",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false,
+          "default": "(now())"
+        }
+      },
+      "indexes": {},
+      "foreignKeys": {
+        "matches_activity_type_id_activity_types_id_fk": {
+          "name": "matches_activity_type_id_activity_types_id_fk",
+          "tableFrom": "matches",
+          "tableTo": "activity_types",
+          "columnsFrom": [
+            "activity_type_id"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "no action",
+          "onUpdate": "no action"
+        },
+        "matches_participant1_id_participants_id_fk": {
+          "name": "matches_participant1_id_participants_id_fk",
+          "tableFrom": "matches",
+          "tableTo": "participants",
+          "columnsFrom": [
+            "participant1_id"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "no action",
+          "onUpdate": "no action"
+        },
+        "matches_participant2_id_participants_id_fk": {
+          "name": "matches_participant2_id_participants_id_fk",
+          "tableFrom": "matches",
+          "tableTo": "participants",
+          "columnsFrom": [
+            "participant2_id"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "no action",
+          "onUpdate": "no action"
+        },
+        "matches_winner_participant_id_participants_id_fk": {
+          "name": "matches_winner_participant_id_participants_id_fk",
+          "tableFrom": "matches",
+          "tableTo": "participants",
+          "columnsFrom": [
+            "winner_participant_id"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "no action",
+          "onUpdate": "no action"
+        },
+        "matches_created_by_profile_id_profiles_id_fk": {
+          "name": "matches_created_by_profile_id_profiles_id_fk",
+          "tableFrom": "matches",
+          "tableTo": "profiles",
+          "columnsFrom": [
+            "created_by_profile_id"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "no action",
+          "onUpdate": "no action"
+        }
+      },
+      "compositePrimaryKeys": {
+        "matches_id": {
+          "name": "matches_id",
+          "columns": [
+            "id"
+          ]
+        }
+      },
+      "uniqueConstraints": {},
+      "checkConstraint": {
+        "matches_participants_different": {
+          "name": "matches_participants_different",
+          "value": "`matches`.`participant1_id` <> `matches`.`participant2_id`"
+        },
+        "matches_winner_is_participant": {
+          "name": "matches_winner_is_participant",
+          "value": "`matches`.`winner_participant_id` in (`matches`.`participant1_id`, `matches`.`participant2_id`)"
+        },
+        "matches_participant1_score_non_negative": {
+          "name": "matches_participant1_score_non_negative",
+          "value": "`matches`.`participant1_score` >= 0"
+        },
+        "matches_participant2_score_non_negative": {
+          "name": "matches_participant2_score_non_negative",
+          "value": "`matches`.`participant2_score` >= 0"
+        },
+        "matches_score_matches_format": {
+          "name": "matches_score_matches_format",
+          "value": "(\n        (`matches`.`match_format` = 'BO1' and (\n          (`matches`.`participant1_score` = 1 and `matches`.`participant2_score` = 0) or\n          (`matches`.`participant1_score` = 0 and `matches`.`participant2_score` = 1)\n        )) or\n        (`matches`.`match_format` = 'BO3' and (\n          (`matches`.`participant1_score` = 2 and `matches`.`participant2_score` in (0, 1)) or\n          (`matches`.`participant2_score` = 2 and `matches`.`participant1_score` in (0, 1))\n        )) or\n        (`matches`.`match_format` = 'BO5' and (\n          (`matches`.`participant1_score` = 3 and `matches`.`participant2_score` in (0, 1, 2)) or\n          (`matches`.`participant2_score` = 3 and `matches`.`participant1_score` in (0, 1, 2))\n        ))\n      )"
+        }
+      }
+    },
+    "participants": {
+      "name": "participants",
+      "columns": {
+        "id": {
+          "name": "id",
+          "type": "varchar(36)",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "profile_id": {
+          "name": "profile_id",
+          "type": "varchar(36)",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "activity_type_id": {
+          "name": "activity_type_id",
+          "type": "varchar(36)",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "is_active": {
+          "name": "is_active",
+          "type": "boolean",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false,
+          "default": true
+        },
+        "created_at": {
+          "name": "created_at",
+          "type": "timestamp",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false,
+          "default": "(now())"
+        },
+        "updated_at": {
+          "name": "updated_at",
+          "type": "timestamp",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false,
+          "default": "(now())"
+        }
+      },
+      "indexes": {},
+      "foreignKeys": {
+        "participants_profile_id_profiles_id_fk": {
+          "name": "participants_profile_id_profiles_id_fk",
+          "tableFrom": "participants",
+          "tableTo": "profiles",
+          "columnsFrom": [
+            "profile_id"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "no action",
+          "onUpdate": "no action"
+        },
+        "participants_activity_type_id_activity_types_id_fk": {
+          "name": "participants_activity_type_id_activity_types_id_fk",
+          "tableFrom": "participants",
+          "tableTo": "activity_types",
+          "columnsFrom": [
+            "activity_type_id"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "no action",
+          "onUpdate": "no action"
+        }
+      },
+      "compositePrimaryKeys": {
+        "participants_id": {
+          "name": "participants_id",
+          "columns": [
+            "id"
+          ]
+        }
+      },
+      "uniqueConstraints": {
+        "participants_profile_activity_unique": {
+          "name": "participants_profile_activity_unique",
+          "columns": [
+            "profile_id",
+            "activity_type_id"
+          ]
+        }
+      },
+      "checkConstraint": {}
+    },
+    "profiles": {
+      "name": "profiles",
+      "columns": {
+        "id": {
+          "name": "id",
+          "type": "varchar(36)",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "auth_user_id": {
+          "name": "auth_user_id",
+          "type": "varchar(255)",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "email": {
+          "name": "email",
+          "type": "varchar(255)",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "first_name": {
+          "name": "first_name",
+          "type": "varchar(120)",
+          "primaryKey": false,
+          "notNull": false,
+          "autoincrement": false
+        },
+        "last_name": {
+          "name": "last_name",
+          "type": "varchar(120)",
+          "primaryKey": false,
+          "notNull": false,
+          "autoincrement": false
+        },
+        "display_name": {
+          "name": "display_name",
+          "type": "varchar(120)",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "role": {
+          "name": "role",
+          "type": "enum('player','organizer','admin')",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false,
+          "default": "'player'"
+        },
+        "is_active": {
+          "name": "is_active",
+          "type": "boolean",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false,
+          "default": true
+        },
+        "created_at": {
+          "name": "created_at",
+          "type": "timestamp",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false,
+          "default": "(now())"
+        },
+        "updated_at": {
+          "name": "updated_at",
+          "type": "timestamp",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false,
+          "default": "(now())"
+        }
+      },
+      "indexes": {},
+      "foreignKeys": {},
+      "compositePrimaryKeys": {
+        "profiles_id": {
+          "name": "profiles_id",
+          "columns": [
+            "id"
+          ]
+        }
+      },
+      "uniqueConstraints": {
+        "profiles_auth_user_id_unique": {
+          "name": "profiles_auth_user_id_unique",
+          "columns": [
+            "auth_user_id"
+          ]
+        },
+        "profiles_email_unique": {
+          "name": "profiles_email_unique",
+          "columns": [
+            "email"
+          ]
+        }
+      },
+      "checkConstraint": {
+        "profiles_email_not_empty": {
+          "name": "profiles_email_not_empty",
+          "value": "char_length(trim(`profiles`.`email`)) > 0"
+        },
+        "profiles_first_name_not_empty": {
+          "name": "profiles_first_name_not_empty",
+          "value": "`profiles`.`first_name` is null or char_length(trim(`profiles`.`first_name`)) > 0"
+        },
+        "profiles_last_name_not_empty": {
+          "name": "profiles_last_name_not_empty",
+          "value": "`profiles`.`last_name` is null or char_length(trim(`profiles`.`last_name`)) > 0"
+        },
+        "profiles_display_name_not_empty": {
+          "name": "profiles_display_name_not_empty",
+          "value": "char_length(trim(`profiles`.`display_name`)) > 0"
+        }
+      }
+    },
+    "rankings": {
+      "name": "rankings",
+      "columns": {
+        "id": {
+          "name": "id",
+          "type": "varchar(36)",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "participant_id": {
+          "name": "participant_id",
+          "type": "varchar(36)",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "rating": {
+          "name": "rating",
+          "type": "int",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false,
+          "default": 1000
+        },
+        "matches_played": {
+          "name": "matches_played",
+          "type": "int",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false,
+          "default": 0
+        },
+        "wins": {
+          "name": "wins",
+          "type": "int",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false,
+          "default": 0
+        },
+        "losses": {
+          "name": "losses",
+          "type": "int",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false,
+          "default": 0
+        },
+        "created_at": {
+          "name": "created_at",
+          "type": "timestamp",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false,
+          "default": "(now())"
+        },
+        "updated_at": {
+          "name": "updated_at",
+          "type": "timestamp",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false,
+          "default": "(now())"
+        }
+      },
+      "indexes": {},
+      "foreignKeys": {
+        "rankings_participant_id_participants_id_fk": {
+          "name": "rankings_participant_id_participants_id_fk",
+          "tableFrom": "rankings",
+          "tableTo": "participants",
+          "columnsFrom": [
+            "participant_id"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "no action",
+          "onUpdate": "no action"
+        }
+      },
+      "compositePrimaryKeys": {
+        "rankings_id": {
+          "name": "rankings_id",
+          "columns": [
+            "id"
+          ]
+        }
+      },
+      "uniqueConstraints": {
+        "rankings_participant_id_unique": {
+          "name": "rankings_participant_id_unique",
+          "columns": [
+            "participant_id"
+          ]
+        }
+      },
+      "checkConstraint": {
+        "rankings_matches_played_non_negative": {
+          "name": "rankings_matches_played_non_negative",
+          "value": "`rankings`.`matches_played` >= 0"
+        },
+        "rankings_wins_non_negative": {
+          "name": "rankings_wins_non_negative",
+          "value": "`rankings`.`wins` >= 0"
+        },
+        "rankings_losses_non_negative": {
+          "name": "rankings_losses_non_negative",
+          "value": "`rankings`.`losses` >= 0"
+        }
+      }
+    }
+  },
+  "views": {},
+  "_meta": {
+    "schemas": {},
+    "tables": {},
+    "columns": {}
+  },
+  "internal": {
+    "tables": {},
+    "indexes": {}
+  }
+}
