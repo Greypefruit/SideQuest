@@ -170,7 +170,7 @@ export async function countActivityRankingEntries(
 ) {
   const [result] = await getDb(database)
     .select({
-      count: sql<number>`count(*)::int`,
+      count: sql<number>`count(*)`.mapWith(Number),
     })
     .from(rankings)
     .innerJoin(participants, eq(rankings.participantId, participants.id))

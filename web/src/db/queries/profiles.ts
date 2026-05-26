@@ -181,7 +181,7 @@ export async function listProfilesForAdmin(database?: DbExecutor) {
 export async function countActiveAdminProfiles(database?: DbExecutor) {
   const [result] = await getDb(database)
     .select({
-      count: sql<number>`count(*)::int`,
+      count: sql<number>`count(*)`.mapWith(Number),
     })
     .from(profiles)
     .where(and(eq(profiles.role, "admin"), eq(profiles.isActive, true)));
