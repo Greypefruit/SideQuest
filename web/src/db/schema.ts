@@ -1,16 +1,16 @@
+import { randomUUID } from "crypto";
 import { sql } from "drizzle-orm";
 import {
   boolean,
   check,
   foreignKey,
-  integer,
-  pgEnum,
-  pgTable,
+  int,
+  mysqlEnum,
+  mysqlTable,
   timestamp,
   unique,
-  uuid,
   varchar,
-} from "drizzle-orm/pg-core";
+} from "drizzle-orm/mysql-core";
 
 const authUserIdLength = 255;
 const emailLength = 255;
@@ -22,41 +22,41 @@ const activityNameLength = 120;
 const competitionTitleLength = 255;
 const locationLength = 255;
 
-export const profileRoleEnum = pgEnum("profile_role", [
+export const profileRoleValues = [
   "player",
   "organizer",
   "admin",
-]);
+] as const;
 
-export const matchFormatEnum = pgEnum("match_format", ["BO1", "BO3", "BO5"]);
+export const matchFormatValues = ["BO1", "BO3", "BO5"] as const;
 
-export const competitionFormatEnum = pgEnum("competition_format", [
+export const competitionFormatValues = [
   "single_elimination",
-]);
+] as const;
 
-export const competitionStatusEnum = pgEnum("competition_status", [
+export const competitionStatusValues = [
   "draft",
   "registration",
   "ready",
   "in_progress",
   "completed",
   "cancelled",
-]);
+] as const;
 
-export const competitionMatchStatusEnum = pgEnum("competition_match_status", [
+export const competitionMatchStatusValues = [
   "pending",
   "completed",
-]);
+] as const;
 
-export const competitionMatchResolutionTypeEnum = pgEnum(
-  "competition_match_resolution_type",
-  ["played", "bye"],
-);
+export const competitionMatchResolutionTypeValues = [
+  "played",
+  "bye",
+] as const;
 
-export const profiles = pgTable(
+export const profiles = mysqlTable(
   "profiles",
   {
-    id: uuid("id").defaultRandom().primaryKey(),
+    id: varchar("id", { length: 36 }).$defaultFn(() => randomUUID()).primaryKey(),
     authUserId: varchar("auth_user_id", { length: authUserIdLength })
       .notNull()
       .unique(),
@@ -64,7 +64,7 @@ export const profiles = pgTable(
     firstName: varchar("first_name", { length: personNameLength }),
     lastName: varchar("last_name", { length: personNameLength }),
     displayName: varchar("display_name", { length: displayNameLength }).notNull(),
-    role: profileRoleEnum("role").notNull().default("player"),
+    role: mysqlEnum("role", profileRoleValues).notNull().default("player"),
     isActive: boolean("is_active").notNull().default(true),
     createdAt: timestamp("created_at").defaultNow().notNull(),
     updatedAt: timestamp("updated_at").defaultNow().notNull(),
@@ -86,13 +86,13 @@ export const profiles = pgTable(
   ],
 );
 
-export const authOtpChallenges = pgTable(
+export const authOtpChallenges = mysqlTable(
   "auth_otp_challenges",
   {
-    id: uuid("id").defaultRandom().primaryKey(),
+    id: varchar("id", { length: 36 }).$defaultFn(() => randomUUID()).primaryKey(),
     email: varchar("email", { length: emailLength }).notNull(),
     codeHash: varchar("code_hash", { length: otpCodeHashLength }).notNull(),
-    attemptsCount: integer("attempts_count").notNull().default(0),
+    attemptsCount: int("attempts_count").notNull().default(0),
     expiresAt: timestamp("expires_at").notNull(),
     resendAvailableAt: timestamp("resend_available_at").notNull(),
     consumedAt: timestamp("consumed_at"),
@@ -112,10 +112,10 @@ export const authOtpChallenges = pgTable(
   ],
 );
 
-export const activityTypes = pgTable(
+export const activityTypes = mysqlTable(
   "activity_types",
   {
-    id: uuid("id").defaultRandom().primaryKey(),
+    id: varchar("id", { length: 36 }).$defaultFn(() => randomUUID()).primaryKey(),
     code: varchar("code", { length: activityCodeLength }).notNull().unique(),
     nameRu: varchar("name_ru", { length: activityNameLength }).notNull(),
     isActive: boolean("is_active").notNull().default(true),
@@ -134,14 +134,14 @@ export const activityTypes = pgTable(
   ],
 );
 
-export const participants = pgTable(
+export const participants = mysqlTable(
   "participants",
   {
-    id: uuid("id").defaultRandom().primaryKey(),
-    profileId: uuid("profile_id")
+    id: varchar("id", { length: 36 }).$defaultFn(() => randomUUID()).primaryKey(),
+    profileId: varchar("profile_id", { length: 36 })
       .notNull()
       .references(() => profiles.id),
-    activityTypeId: uuid("activity_type_id")
+    activityTypeId: varchar("activity_type_id", { length: 36 })
       .notNull()
       .references(() => activityTypes.id),
     isActive: boolean("is_active").notNull().default(true),
@@ -156,18 +156,18 @@ export const participants = pgTable(
   ],
 );
 
-export const rankings = pgTable(
+export const rankings = mysqlTable(
   "rankings",
   {
-    id: uuid("id").defaultRandom().primaryKey(),
-    participantId: uuid("participant_id")
+    id: varchar("id", { length: 36 }).$defaultFn(() => randomUUID()).primaryKey(),
+    participantId: varchar("participant_id", { length: 36 })
       .notNull()
       .references(() => participants.id)
       .unique(),
-    rating: integer("rating").notNull().default(1000),
-    matchesPlayed: integer("matches_played").notNull().default(0),
-    wins: integer("wins").notNull().default(0),
-    losses: integer("losses").notNull().default(0),
+    rating: int("rating").notNull().default(1000),
+    matchesPlayed: int("matches_played").notNull().default(0),
+    wins: int("wins").notNull().default(0),
+    losses: int("losses").notNull().default(0),
     createdAt: timestamp("created_at").defaultNow().notNull(),
     updatedAt: timestamp("updated_at").defaultNow().notNull(),
   },
@@ -178,26 +178,26 @@ export const rankings = pgTable(
   ],
 );
 
-export const matches = pgTable(
+export const matches = mysqlTable(
   "matches",
   {
-    id: uuid("id").defaultRandom().primaryKey(),
-    activityTypeId: uuid("activity_type_id")
+    id: varchar("id", { length: 36 }).$defaultFn(() => randomUUID()).primaryKey(),
+    activityTypeId: varchar("activity_type_id", { length: 36 })
       .notNull()
       .references(() => activityTypes.id),
-    participant1Id: uuid("participant1_id")
+    participant1Id: varchar("participant1_id", { length: 36 })
       .notNull()
       .references(() => participants.id),
-    participant2Id: uuid("participant2_id")
+    participant2Id: varchar("participant2_id", { length: 36 })
       .notNull()
       .references(() => participants.id),
-    matchFormat: matchFormatEnum("match_format").notNull(),
-    participant1Score: integer("participant1_score").notNull(),
-    participant2Score: integer("participant2_score").notNull(),
-    winnerParticipantId: uuid("winner_participant_id")
+    matchFormat: mysqlEnum("match_format", matchFormatValues).notNull(),
+    participant1Score: int("participant1_score").notNull(),
+    participant2Score: int("participant2_score").notNull(),
+    winnerParticipantId: varchar("winner_participant_id", { length: 36 })
       .notNull()
       .references(() => participants.id),
-    createdByProfileId: uuid("created_by_profile_id")
+    createdByProfileId: varchar("created_by_profile_id", { length: 36 })
       .notNull()
       .references(() => profiles.id),
     playedAt: timestamp("played_at").notNull(),
@@ -240,23 +240,23 @@ export const matches = pgTable(
   ],
 );
 
-export const competitions = pgTable(
+export const competitions = mysqlTable(
   "competitions",
   {
-    id: uuid("id").defaultRandom().primaryKey(),
-    activityTypeId: uuid("activity_type_id")
+    id: varchar("id", { length: 36 }).$defaultFn(() => randomUUID()).primaryKey(),
+    activityTypeId: varchar("activity_type_id", { length: 36 })
       .notNull()
       .references(() => activityTypes.id),
     title: varchar("title", { length: competitionTitleLength }).notNull(),
-    format: competitionFormatEnum("format")
+    format: mysqlEnum("format", competitionFormatValues)
       .notNull()
       .default("single_elimination"),
-    matchFormat: matchFormatEnum("match_format").notNull(),
-    status: competitionStatusEnum("status").notNull().default("draft"),
-    maxParticipants: integer("max_participants").notNull().default(16),
+    matchFormat: mysqlEnum("match_format", matchFormatValues).notNull(),
+    status: mysqlEnum("status", competitionStatusValues).notNull().default("draft"),
+    maxParticipants: int("max_participants").notNull().default(16),
     scheduledAt: timestamp("scheduled_at"),
     location: varchar("location", { length: locationLength }),
-    createdByProfileId: uuid("created_by_profile_id")
+    createdByProfileId: varchar("created_by_profile_id", { length: 36 })
       .notNull()
       .references(() => profiles.id),
     startedAt: timestamp("started_at"),
@@ -276,20 +276,20 @@ export const competitions = pgTable(
   ],
 );
 
-export const competitionParticipants = pgTable(
+export const competitionParticipants = mysqlTable(
   "competition_participants",
   {
-    id: uuid("id").defaultRandom().primaryKey(),
-    competitionId: uuid("competition_id")
+    id: varchar("id", { length: 36 }).$defaultFn(() => randomUUID()).primaryKey(),
+    competitionId: varchar("competition_id", { length: 36 })
       .notNull()
       .references(() => competitions.id),
-    participantId: uuid("participant_id")
+    participantId: varchar("participant_id", { length: 36 })
       .notNull()
       .references(() => participants.id),
-    addedByProfileId: uuid("added_by_profile_id")
+    addedByProfileId: varchar("added_by_profile_id", { length: 36 })
       .notNull()
       .references(() => profiles.id),
-    ratingAtSeeding: integer("rating_at_seeding"),
+    ratingAtSeeding: int("rating_at_seeding"),
     createdAt: timestamp("created_at").defaultNow().notNull(),
   },
   (table) => [
@@ -300,31 +300,31 @@ export const competitionParticipants = pgTable(
   ],
 );
 
-export const competitionMatches = pgTable(
+export const competitionMatches = mysqlTable(
   "competition_matches",
   {
-    id: uuid("id").defaultRandom().primaryKey(),
-    competitionId: uuid("competition_id")
+    id: varchar("id", { length: 36 }).$defaultFn(() => randomUUID()).primaryKey(),
+    competitionId: varchar("competition_id", { length: 36 })
       .notNull()
       .references(() => competitions.id),
-    roundNumber: integer("round_number").notNull(),
-    matchNumber: integer("match_number").notNull(),
-    slot1ParticipantId: uuid("slot1_participant_id").references(
+    roundNumber: int("round_number").notNull(),
+    matchNumber: int("match_number").notNull(),
+    slot1ParticipantId: varchar("slot1_participant_id", { length: 36 }).references(
       () => participants.id,
     ),
-    slot2ParticipantId: uuid("slot2_participant_id").references(
+    slot2ParticipantId: varchar("slot2_participant_id", { length: 36 }).references(
       () => participants.id,
     ),
-    slot1Score: integer("slot1_score"),
-    slot2Score: integer("slot2_score"),
-    winnerParticipantId: uuid("winner_participant_id").references(
+    slot1Score: int("slot1_score"),
+    slot2Score: int("slot2_score"),
+    winnerParticipantId: varchar("winner_participant_id", { length: 36 }).references(
       () => participants.id,
     ),
-    status: competitionMatchStatusEnum("status").notNull().default("pending"),
-    resolutionType: competitionMatchResolutionTypeEnum("resolution_type"),
-    nextMatchId: uuid("next_match_id"),
-    nextMatchSlot: integer("next_match_slot"),
-    reportedByProfileId: uuid("reported_by_profile_id").references(
+    status: mysqlEnum("status", competitionMatchStatusValues).notNull().default("pending"),
+    resolutionType: mysqlEnum("resolution_type", competitionMatchResolutionTypeValues),
+    nextMatchId: varchar("next_match_id", { length: 36 }),
+    nextMatchSlot: int("next_match_slot"),
+    reportedByProfileId: varchar("reported_by_profile_id", { length: 36 }).references(
       () => profiles.id,
     ),
     completedAt: timestamp("completed_at"),

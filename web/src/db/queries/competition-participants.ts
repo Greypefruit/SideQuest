@@ -1,4 +1,5 @@
 import "server-only";
+import { randomUUID } from "crypto";
 import { and, asc, eq } from "drizzle-orm";
 import { type DbExecutor } from "../index";
 import {
@@ -54,10 +55,19 @@ export async function addCompetitionParticipant(
   input: AddCompetitionParticipantInput,
   database?: DbExecutor,
 ) {
-  const [competitionParticipant] = await getDb(database)
-    .insert(competitionParticipants)
-    .values(input)
-    .returning();
+  const connection = getDb(database);
+  const id = randomUUID();
+
+  await connection.insert(competitionParticipants).values({
+    ...input,
+    id,
+  });
+
+  const [competitionParticipant] = await connection
+    .select()
+    .from(competitionParticipants)
+    .where(eq(competitionParticipants.id, id))
+    .limit(1);
 
   return competitionParticipant;
 }
@@ -67,17 +77,28 @@ export async function removeCompetitionParticipant(
   participantId: string,
   database?: DbExecutor,
 ) {
-  const [competitionParticipant] = await getDb(database)
-    .delete(competitionParticipants)
+  const connection = getDb(database);
+
+  const [competitionParticipant] = await connection
+    .select()
+    .from(competitionParticipants)
     .where(
       and(
         eq(competitionParticipants.competitionId, competitionId),
         eq(competitionParticipants.participantId, participantId),
       ),
     )
-    .returning();
+    .limit(1);
 
-  return competitionParticipant ?? null;
+  if (!competitionParticipant) {
+    return null;
+  }
+
+  await connection
+    .delete(competitionParticipants)
+    .where(eq(competitionParticipants.id, competitionParticipant.id));
+
+  return competitionParticipant;
 }
 
 export async function isParticipantInCompetition(

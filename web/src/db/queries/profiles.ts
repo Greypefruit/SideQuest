@@ -1,4 +1,5 @@
 import "server-only";
+import { randomUUID } from "crypto";
 import { and, asc, desc, eq, sql } from "drizzle-orm";
 import { type DbExecutor } from "../index";
 import { profiles } from "../schema";
@@ -59,14 +60,21 @@ export async function createProfile(
   input: CreateProfileInput,
   database?: DbExecutor,
 ) {
-  const [profile] = await getDb(database)
-    .insert(profiles)
-    .values({
-      ...input,
-      email: normalizeEmail(input.email),
-      displayName: input.displayName.trim(),
-    })
-    .returning();
+  const connection = getDb(database);
+  const id = randomUUID();
+
+  await connection.insert(profiles).values({
+    ...input,
+    id,
+    email: normalizeEmail(input.email),
+    displayName: input.displayName.trim(),
+  });
+
+  const [profile] = await connection
+    .select()
+    .from(profiles)
+    .where(eq(profiles.id, id))
+    .limit(1);
 
   return profile;
 }
@@ -77,21 +85,13 @@ export async function ensureProfileExists(
 ) {
   const connection = getDb(database);
 
-  const [createdProfile] = await connection
-    .insert(profiles)
-    .values({
-      ...input,
-      email: normalizeEmail(input.email),
-      displayName: input.displayName.trim(),
-    })
-    .onConflictDoNothing({ target: profiles.email })
-    .returning();
+  const existingProfile = await getProfileByEmail(input.email, connection);
 
-  if (createdProfile) {
-    return createdProfile;
+  if (existingProfile) {
+    return existingProfile;
   }
 
-  return getProfileByEmail(input.email, connection);
+  return createProfile(input, connection);
 }
 
 export async function updateProfile(
@@ -131,13 +131,14 @@ export async function updateProfile(
 
   patch.updatedAt = new Date();
 
-  const [profile] = await getDb(database)
+  const connection = getDb(database);
+
+  await connection
     .update(profiles)
     .set(patch)
-    .where(eq(profiles.id, profileId))
-    .returning();
+    .where(eq(profiles.id, profileId));
 
-  return profile ?? null;
+  return getProfileById(profileId, connection);
 }
 
 export async function getProfileIsActive(

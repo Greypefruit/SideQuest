@@ -1,4 +1,5 @@
 import "server-only";
+import { randomUUID } from "crypto";
 import { and, desc, eq, inArray, or, sql } from "drizzle-orm";
 import { alias } from "drizzle-orm/mysql-core";
 import { type DbExecutor } from "../index";
@@ -160,14 +161,21 @@ export async function createCompetition(
   input: CreateCompetitionInput,
   database?: DbExecutor,
 ) {
-  const [competition] = await getDb(database)
-    .insert(competitions)
-    .values({
-      ...input,
-      title: input.title.trim(),
-      location: input.location?.trim() || null,
-    })
-    .returning();
+  const connection = getDb(database);
+  const id = randomUUID();
+
+  await connection.insert(competitions).values({
+    ...input,
+    id,
+    title: input.title.trim(),
+    location: input.location?.trim() || null,
+  });
+
+  const [competition] = await connection
+    .select()
+    .from(competitions)
+    .where(eq(competitions.id, id))
+    .limit(1);
 
   return competition;
 }

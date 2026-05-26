@@ -1,4 +1,5 @@
 import "server-only";
+import { randomUUID } from "crypto";
 import { and, asc, desc, eq, inArray, or } from "drizzle-orm";
 import { alias } from "drizzle-orm/mysql-core";
 import { type DbExecutor } from "../index";
@@ -197,10 +198,19 @@ export async function createCompetitionMatch(
   input: CreateCompetitionMatchInput,
   database?: DbExecutor,
 ) {
-  const [competitionMatch] = await getDb(database)
-    .insert(competitionMatches)
-    .values(input)
-    .returning();
+  const connection = getDb(database);
+  const id = randomUUID();
+
+  await connection.insert(competitionMatches).values({
+    ...input,
+    id,
+  });
+
+  const [competitionMatch] = await connection
+    .select()
+    .from(competitionMatches)
+    .where(eq(competitionMatches.id, id))
+    .limit(1);
 
   return competitionMatch;
 }
@@ -213,7 +223,23 @@ export async function createCompetitionMatches(
     return [];
   }
 
-  return getDb(database).insert(competitionMatches).values(input).returning();
+  const connection = getDb(database);
+  const rows = input.map((item) => ({
+    ...item,
+    id: randomUUID(),
+  }));
+
+  await connection.insert(competitionMatches).values(rows);
+
+  return connection
+    .select()
+    .from(competitionMatches)
+    .where(
+      inArray(
+        competitionMatches.id,
+        rows.map((row) => row.id),
+      ),
+    );
 }
 
 export async function updateCompetitionMatchResult(
@@ -221,17 +247,23 @@ export async function updateCompetitionMatchResult(
   input: UpdateCompetitionMatchResultInput,
   database?: DbExecutor,
 ) {
+  const connection = getDb(database);
   const patch: UpdateCompetitionMatchResultInput & { updatedAt?: Date } = {
     ...input,
   };
 
   patch.updatedAt = new Date();
 
-  const [competitionMatch] = await getDb(database)
+  await connection
     .update(competitionMatches)
     .set(patch)
+    .where(eq(competitionMatches.id, competitionMatchId));
+
+  const [competitionMatch] = await connection
+    .select()
+    .from(competitionMatches)
     .where(eq(competitionMatches.id, competitionMatchId))
-    .returning();
+    .limit(1);
 
   return competitionMatch ?? null;
 }

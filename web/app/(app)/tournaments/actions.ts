@@ -800,18 +800,23 @@ export async function removeTournamentParticipantAction(input: {
     }
 
     const [removedParticipant] = await tx
-      .delete(schema.competitionParticipants)
+      .select()
+      .from(schema.competitionParticipants)
       .where(
         and(
           eq(schema.competitionParticipants.competitionId, input.competitionId),
           eq(schema.competitionParticipants.participantId, input.participantId),
         ),
       )
-      .returning();
+      .limit(1);
 
     if (!removedParticipant) {
       return buildTournamentActionError("Участник не найден в этом турнире.");
     }
+
+    await tx
+      .delete(schema.competitionParticipants)
+      .where(eq(schema.competitionParticipants.id, removedParticipant.id));
 
     return buildTournamentActionSuccess("Участник удален.");
   });
@@ -1132,18 +1137,23 @@ export async function unregisterFromTournamentAction(input: { competitionId: str
     }
 
     const [removedParticipant] = await tx
-      .delete(schema.competitionParticipants)
+      .select()
+      .from(schema.competitionParticipants)
       .where(
         and(
           eq(schema.competitionParticipants.competitionId, input.competitionId),
           eq(schema.competitionParticipants.participantId, participant.id),
         ),
       )
-      .returning();
+      .limit(1);
 
     if (!removedParticipant) {
       return buildTournamentActionError("Вы не зарегистрированы в этом турнире.");
     }
+
+    await tx
+      .delete(schema.competitionParticipants)
+      .where(eq(schema.competitionParticipants.id, removedParticipant.id));
 
     return buildTournamentActionSuccess("Регистрация отменена.");
   });
@@ -1319,7 +1329,7 @@ export async function saveTournamentMatchResultAction(input: {
       return buildTournamentActionError("Победитель должен соответствовать итоговому счету.");
     }
 
-    const [updatedMatch] = await tx
+    await tx
       .update(schema.competitionMatches)
       .set({
         slot1Score: input.score.player1,
@@ -1336,8 +1346,18 @@ export async function saveTournamentMatchResultAction(input: {
           eq(schema.competitionMatches.id, input.competitionMatchId),
           eq(schema.competitionMatches.status, "pending"),
         ),
+      );
+
+    const [updatedMatch] = await tx
+      .select()
+      .from(schema.competitionMatches)
+      .where(
+        and(
+          eq(schema.competitionMatches.id, input.competitionMatchId),
+          eq(schema.competitionMatches.status, "completed"),
+        ),
       )
-      .returning();
+      .limit(1);
 
     if (!updatedMatch) {
       return buildTournamentActionError("Результат этого матча уже был сохранен ранее.");

@@ -1,4 +1,5 @@
 import "server-only";
+import { randomUUID } from "crypto";
 import { and, desc, eq, isNull } from "drizzle-orm";
 import { type DbExecutor } from "../index";
 import { authOtpChallenges } from "../schema";
@@ -47,13 +48,20 @@ export async function createOtpChallenge(
   input: CreateOtpChallengeInput,
   database?: DbExecutor,
 ) {
-  const [challenge] = await getDb(database)
-    .insert(authOtpChallenges)
-    .values({
-      ...input,
-      email: normalizeEmail(input.email),
-    })
-    .returning();
+  const connection = getDb(database);
+  const id = randomUUID();
+
+  await connection.insert(authOtpChallenges).values({
+    ...input,
+    id,
+    email: normalizeEmail(input.email),
+  });
+
+  const [challenge] = await connection
+    .select()
+    .from(authOtpChallenges)
+    .where(eq(authOtpChallenges.id, id))
+    .limit(1);
 
   return challenge;
 }
@@ -62,9 +70,22 @@ export async function invalidateActiveOtpChallenges(
   email: string,
   database?: DbExecutor,
 ) {
+  const connection = getDb(database);
   const now = new Date();
+  const normalizedEmail = normalizeEmail(email);
 
-  return getDb(database)
+  const challenges = await connection
+    .select()
+    .from(authOtpChallenges)
+    .where(
+      and(
+        eq(authOtpChallenges.email, normalizedEmail),
+        isNull(authOtpChallenges.consumedAt),
+        isNull(authOtpChallenges.invalidatedAt),
+      ),
+    );
+
+  await connection
     .update(authOtpChallenges)
     .set({
       invalidatedAt: now,
@@ -72,21 +93,23 @@ export async function invalidateActiveOtpChallenges(
     })
     .where(
       and(
-        eq(authOtpChallenges.email, normalizeEmail(email)),
+        eq(authOtpChallenges.email, normalizedEmail),
         isNull(authOtpChallenges.consumedAt),
         isNull(authOtpChallenges.invalidatedAt),
       ),
-    )
-    .returning();
+    );
+
+  return challenges;
 }
 
 export async function consumeOtpChallenge(
   challengeId: string,
   database?: DbExecutor,
 ) {
+  const connection = getDb(database);
   const now = new Date();
 
-  const [challenge] = await getDb(database)
+  await connection
     .update(authOtpChallenges)
     .set({
       consumedAt: now,
@@ -98,19 +121,25 @@ export async function consumeOtpChallenge(
         isNull(authOtpChallenges.consumedAt),
         isNull(authOtpChallenges.invalidatedAt),
       ),
-    )
-    .returning();
+    );
 
-  return challenge ?? null;
+  const [challenge] = await connection
+    .select()
+    .from(authOtpChallenges)
+    .where(eq(authOtpChallenges.id, challengeId))
+    .limit(1);
+
+  return challenge?.consumedAt ? challenge : null;
 }
 
 export async function markOtpChallengeExpired(
   challengeId: string,
   database?: DbExecutor,
 ) {
+  const connection = getDb(database);
   const now = new Date();
 
-  const [challenge] = await getDb(database)
+  await connection
     .update(authOtpChallenges)
     .set({
       invalidatedAt: now,
@@ -121,19 +150,25 @@ export async function markOtpChallengeExpired(
         eq(authOtpChallenges.id, challengeId),
         isNull(authOtpChallenges.invalidatedAt),
       ),
-    )
-    .returning();
+    );
 
-  return challenge ?? null;
+  const [challenge] = await connection
+    .select()
+    .from(authOtpChallenges)
+    .where(eq(authOtpChallenges.id, challengeId))
+    .limit(1);
+
+  return challenge?.invalidatedAt ? challenge : null;
 }
 
 export async function invalidateOtpChallenge(
   challengeId: string,
   database?: DbExecutor,
 ) {
+  const connection = getDb(database);
   const now = new Date();
 
-  const [challenge] = await getDb(database)
+  await connection
     .update(authOtpChallenges)
     .set({
       invalidatedAt: now,
@@ -145,10 +180,15 @@ export async function invalidateOtpChallenge(
         isNull(authOtpChallenges.consumedAt),
         isNull(authOtpChallenges.invalidatedAt),
       ),
-    )
-    .returning();
+    );
 
-  return challenge ?? null;
+  const [challenge] = await connection
+    .select()
+    .from(authOtpChallenges)
+    .where(eq(authOtpChallenges.id, challengeId))
+    .limit(1);
+
+  return challenge?.invalidatedAt ? challenge : null;
 }
 
 export async function registerFailedOtpAttempt(
@@ -156,9 +196,10 @@ export async function registerFailedOtpAttempt(
   nextAttemptsCount: number,
   database?: DbExecutor,
 ) {
+  const connection = getDb(database);
   const now = new Date();
 
-  const [challenge] = await getDb(database)
+  await connection
     .update(authOtpChallenges)
     .set({
       attemptsCount: nextAttemptsCount,
@@ -170,8 +211,13 @@ export async function registerFailedOtpAttempt(
         eq(authOtpChallenges.id, challengeId),
         isNull(authOtpChallenges.consumedAt),
       ),
-    )
-    .returning();
+    );
+
+  const [challenge] = await connection
+    .select()
+    .from(authOtpChallenges)
+    .where(eq(authOtpChallenges.id, challengeId))
+    .limit(1);
 
   return challenge ?? null;
 }

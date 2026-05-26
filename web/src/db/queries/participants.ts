@@ -1,4 +1,5 @@
 import "server-only";
+import { randomUUID } from "crypto";
 import { and, asc, eq } from "drizzle-orm";
 import { type DbExecutor } from "../index";
 import { activityTypes, participants, profiles } from "../schema";
@@ -76,10 +77,19 @@ export async function createParticipant(
   input: CreateParticipantInput,
   database?: DbExecutor,
 ) {
-  const [participant] = await getDb(database)
-    .insert(participants)
-    .values(input)
-    .returning();
+  const connection = getDb(database);
+  const id = randomUUID();
+
+  await connection.insert(participants).values({
+    ...input,
+    id,
+  });
+
+  const [participant] = await connection
+    .select()
+    .from(participants)
+    .where(eq(participants.id, id))
+    .limit(1);
 
   return participant;
 }
@@ -90,23 +100,17 @@ export async function ensureParticipantExists(
 ) {
   const connection = getDb(database);
 
-  const [createdParticipant] = await connection
-    .insert(participants)
-    .values(input)
-    .onConflictDoNothing({
-      target: [participants.profileId, participants.activityTypeId],
-    })
-    .returning();
-
-  if (createdParticipant) {
-    return createdParticipant;
-  }
-
-  return getParticipantByProfileAndActivity(
+  const existingParticipant = await getParticipantByProfileAndActivity(
     input.profileId,
     input.activityTypeId,
     connection,
   );
+
+  if (existingParticipant) {
+    return existingParticipant;
+  }
+
+  return createParticipant(input, connection);
 }
 
 export async function listActiveParticipantProfilesByActivity(

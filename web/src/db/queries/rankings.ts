@@ -1,4 +1,5 @@
 import "server-only";
+import { randomUUID } from "crypto";
 import { and, asc, eq, sql } from "drizzle-orm";
 import { type DbExecutor } from "../index";
 import { activityTypes, participants, profiles, rankings } from "../schema";
@@ -43,10 +44,19 @@ export async function createRanking(
   input: CreateRankingInput,
   database?: DbExecutor,
 ) {
-  const [ranking] = await getDb(database)
-    .insert(rankings)
-    .values(input)
-    .returning();
+  const connection = getDb(database);
+  const id = randomUUID();
+
+  await connection.insert(rankings).values({
+    ...input,
+    id,
+  });
+
+  const [ranking] = await connection
+    .select()
+    .from(rankings)
+    .where(eq(rankings.id, id))
+    .limit(1);
 
   return ranking;
 }
@@ -57,17 +67,16 @@ export async function ensureRankingExists(
 ) {
   const connection = getDb(database);
 
-  const [createdRanking] = await connection
-    .insert(rankings)
-    .values(input)
-    .onConflictDoNothing({ target: rankings.participantId })
-    .returning();
+  const existingRanking = await getRankingByParticipantId(
+    input.participantId,
+    connection,
+  );
 
-  if (createdRanking) {
-    return createdRanking;
+  if (existingRanking) {
+    return existingRanking;
   }
 
-  return getRankingByParticipantId(input.participantId, connection);
+  return createRanking(input, connection);
 }
 
 export async function updateRankingByParticipantId(
@@ -99,13 +108,14 @@ export async function updateRankingByParticipantId(
 
   patch.updatedAt = new Date();
 
-  const [ranking] = await getDb(database)
+  const connection = getDb(database);
+
+  await connection
     .update(rankings)
     .set(patch)
-    .where(eq(rankings.participantId, participantId))
-    .returning();
+    .where(eq(rankings.participantId, participantId));
 
-  return ranking ?? null;
+  return getRankingByParticipantId(participantId, connection);
 }
 
 export async function getProfileRanking(

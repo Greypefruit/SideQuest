@@ -1,4 +1,5 @@
 import "server-only";
+import { randomUUID } from "crypto";
 import { and, desc, eq, or } from "drizzle-orm";
 import { alias } from "drizzle-orm/mysql-core";
 import { type DbExecutor } from "../index";
@@ -146,10 +147,19 @@ export async function createMatch(
   input: CreateMatchInput,
   database?: DbExecutor,
 ) {
-  const [match] = await getDb(database)
-    .insert(matches)
-    .values(input)
-    .returning();
+  const connection = getDb(database);
+  const id = randomUUID();
+
+  await connection.insert(matches).values({
+    ...input,
+    id,
+  });
+
+  const [match] = await connection
+    .select()
+    .from(matches)
+    .where(eq(matches.id, id))
+    .limit(1);
 
   return match;
 }

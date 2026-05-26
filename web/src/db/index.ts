@@ -1,6 +1,6 @@
 import "server-only";
-import { drizzle } from "drizzle-orm/postgres-js";
-import postgres from "postgres";
+import { drizzle } from "drizzle-orm/mysql2";
+import mysql from "mysql2/promise";
 import * as schema from "./schema";
 
 const connectionString = process.env.DATABASE_URL;
@@ -9,10 +9,10 @@ if (!connectionString) {
   throw new Error("DATABASE_URL is not set");
 }
 
-const sql = postgres(connectionString, { max: 1 });
+const pool = mysql.createPool(connectionString);
 
-export const db = drizzle(sql, { schema });
-export { schema, sql };
+export const db = drizzle(pool, { schema, mode: "default" });
+export { schema, pool };
 
 export type DatabaseClient = typeof db;
 export type DatabaseTransaction = Parameters<
