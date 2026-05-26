@@ -6,3 +6,4 @@ compose.yaml
 *.sql
 compose.yaml.backup
 *.bak
+!web/drizzle-mysql/**/*.sql
