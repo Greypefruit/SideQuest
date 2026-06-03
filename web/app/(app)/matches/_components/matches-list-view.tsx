@@ -40,19 +40,6 @@ type MatchesListViewProps = {
 const MATCHES_PAGE_SIZE_DESKTOP = 20;
 const MATCHES_PAGE_SIZE_MOBILE = 10;
 
-const FULL_NAME_BY_SHORT_NAME: Record<string, string> = {
-  "Иванов А.": "Алексей Иванов",
-  "Котов М.": "Михаил Котов",
-  "Ларин Д.": "Дмитрий Ларин",
-  "Волков С.": "Сергей Волков",
-  "Попов Е.": "Егор Попов",
-  "Соколов К.": "Константин Соколов",
-  "Лебедев И.": "Илья Лебедев",
-  "Фомин Р.": "Роман Фомин",
-  "Киселев Н.": "Никита Киселев",
-  "Громов П.": "Павел Громов",
-};
-
 const FORMAT_CHIP_CLASS =
   "inline-flex min-h-6 items-center rounded-[var(--radius-default)] border border-slate-200 bg-slate-100 px-2.5 text-[0.7rem] font-semibold text-slate-600";
 
@@ -98,12 +85,8 @@ function getLoserRatingDelta(match: MatchItem) {
   return match.loserRatingDelta;
 }
 
-function getFullPlayerName(name: string) {
-  return FULL_NAME_BY_SHORT_NAME[name] ?? name;
-}
-
 function getMobilePlayerName(name: string) {
-  const fullName = getFullPlayerName(name).trim();
+  const fullName = name.trim();
   const [firstName, lastName, ...rest] = fullName.split(/\s+/);
 
   if (!firstName || !lastName || rest.length > 0) {
@@ -340,7 +323,7 @@ function DesktopMatchesTable({
                 <td className="px-5 py-3.5 align-middle">
                   <div className="min-w-0">
                     <span className="block truncate text-[0.92rem] font-medium text-slate-800">
-                      {getFullPlayerName(getWinnerName(match))}
+                      {getWinnerName(match)}
                     </span>
                     <RatingDeltaMeta delta={getWinnerRatingDelta(match)} direction="up" />
                   </div>
@@ -348,7 +331,7 @@ function DesktopMatchesTable({
                 <td className="px-5 py-3.5 align-middle">
                   <div className="min-w-0">
                     <span className="block truncate text-[0.92rem] font-medium text-slate-700">
-                      {getFullPlayerName(getLoserName(match))}
+                      {getLoserName(match)}
                     </span>
                     <RatingDeltaMeta delta={getLoserRatingDelta(match)} direction="down" />
                   </div>
@@ -596,9 +579,35 @@ export function MatchesListView({
   const highlightTimeoutRef = useRef<number | null>(null);
   const consumedHighlightMatchIdRef = useRef<string | null>(null);
 
+  // Adjust derived state during render instead of in an effect (the React-
+  // recommended pattern for syncing state to a prop/URL): reveal a deep-linked
+  // match by switching to its tab. Guarded so it converges and never loops.
+  if (
+    pendingHighlightMatchId &&
+    highlightedMatch &&
+    highlightedMatch.matchType !== selectedMatchType
+  ) {
+    setSelectedMatchType(highlightedMatch.matchType);
+    setRequestedPage(1);
+  }
+
   const typeFilteredMatches = matches.filter(
     (match) => match.matchType === selectedMatchType,
   );
+
+  if (hasResolvedViewport && pendingHighlightMatchId) {
+    const highlightedMatchIndex = typeFilteredMatches.findIndex(
+      (match) => match.id === pendingHighlightMatchId,
+    );
+
+    if (highlightedMatchIndex !== -1) {
+      const highlightedMatchPage = Math.floor(highlightedMatchIndex / pageSize) + 1;
+
+      if (requestedPage !== highlightedMatchPage) {
+        setRequestedPage(highlightedMatchPage);
+      }
+    }
+  }
 
   const filteredMatches = typeFilteredMatches.filter((match) => {
     if (!normalizedSearchValue) {
@@ -620,40 +629,10 @@ export function MatchesListView({
     !currentMatches.some((match) => match.id === pendingHighlightMatchId);
 
   useEffect(() => {
-    if (
-      pendingHighlightMatchId &&
-      highlightedMatch &&
-      highlightedMatch.matchType !== selectedMatchType
-    ) {
-      setSelectedMatchType(highlightedMatch.matchType);
-      setRequestedPage(1);
-    }
-  }, [pendingHighlightMatchId, highlightedMatch, selectedMatchType]);
-
-  useEffect(() => {
-    if (!hasResolvedViewport) {
-      return;
-    }
-
     if (!pendingHighlightMatchId) {
       consumedHighlightMatchIdRef.current = null;
-      return;
     }
-
-    const matchIndex = typeFilteredMatches.findIndex(
-      (match) => match.id === pendingHighlightMatchId,
-    );
-
-    if (matchIndex === -1) {
-      return;
-    }
-
-    const nextPage = Math.floor(matchIndex / pageSize) + 1;
-
-    if (requestedPage !== nextPage) {
-      setRequestedPage(nextPage);
-    }
-  }, [hasResolvedViewport, pageSize, pendingHighlightMatchId, requestedPage, typeFilteredMatches]);
+  }, [pendingHighlightMatchId]);
 
   useEffect(() => {
     if (!hasResolvedViewport) {

@@ -2,6 +2,8 @@ import type { ReactNode } from "react";
 import { getProfileById } from "@/src/db/queries";
 import { requireCurrentViewer } from "@/src/auth/current-viewer";
 
+const NAME_FIELD_MAX_LENGTH = 120;
+
 function getRoleLabel(role: "player" | "organizer" | "admin") {
   switch (role) {
     case "player":
@@ -72,6 +74,7 @@ function EditableField({ label, name, defaultValue, placeholder }: FieldProps) {
       <input
         className="mt-1 min-h-7 w-full border-0 border-b border-slate-200 bg-transparent px-0 pb-1 pt-0 text-[0.96rem] font-medium leading-tight text-slate-800 outline-none transition placeholder:text-slate-300 focus:border-blue-500 focus:ring-0 md:text-[0.9rem]"
         defaultValue={defaultValue}
+        maxLength={NAME_FIELD_MAX_LENGTH}
         name={name}
         placeholder={placeholder}
         required
@@ -120,6 +123,7 @@ function DesktopEditableField({
       <input
         className="mt-2 min-h-7 w-full border-0 border-b border-slate-200 bg-transparent px-0 pb-1.5 pt-0 text-[0.88rem] font-medium leading-tight text-slate-800 outline-none transition placeholder:text-slate-300 focus:border-blue-500 focus:ring-0"
         defaultValue={defaultValue}
+        maxLength={NAME_FIELD_MAX_LENGTH}
         name={name}
         placeholder={placeholder}
         required
@@ -155,6 +159,12 @@ export default async function ProfilePage({ searchParams }: ProfilePageProps) {
   const paramsPromise: Promise<ProfileSearchParams> = searchParams ?? Promise.resolve({});
   const params = await paramsPromise;
   const roleLabel = getRoleLabel(profile.role);
+  const nameErrorMessage =
+    params.error === "required"
+      ? "Укажите имя и фамилию."
+      : params.error === "too_long"
+        ? `Имя и фамилия не должны превышать ${NAME_FIELD_MAX_LENGTH} символов.`
+        : null;
 
   return (
     <div className="mx-auto w-full max-w-[1040px] min-w-0 overflow-x-hidden">
@@ -187,8 +197,8 @@ export default async function ProfilePage({ searchParams }: ProfilePageProps) {
 
                   <div className="flex items-center justify-between gap-4 pt-1">
                     <div className="min-h-4 text-[0.74rem]">
-                      {params.error === "required" ? (
-                        <p className="text-rose-600">Укажите имя и фамилию.</p>
+                      {nameErrorMessage ? (
+                        <p className="text-rose-600">{nameErrorMessage}</p>
                       ) : params.saved === "1" ? (
                         <p className="text-emerald-600">Изменения сохранены.</p>
                       ) : null}
@@ -241,8 +251,8 @@ export default async function ProfilePage({ searchParams }: ProfilePageProps) {
 
             <div className="border-t border-slate-100 pt-2.5">
               <div className="min-h-4 text-[0.78rem]">
-                {params.error === "required" ? (
-                  <p className="text-rose-600">Укажите имя и фамилию.</p>
+                {nameErrorMessage ? (
+                  <p className="text-rose-600">{nameErrorMessage}</p>
                 ) : params.saved === "1" ? (
                   <p className="text-emerald-600">Изменения сохранены.</p>
                 ) : null}
